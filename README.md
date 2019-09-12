@@ -14,8 +14,8 @@ Usage:
 
 `$ ./lzwarc xp password archivename [dest_dir/ [pref1 pref2 ...]]`
 
--- extract items to which internal path begins with one of given prefixes (defaults to any) to dest_dir/ (defaults to current)
+-- extract files to which internal path begins with one of given prefixes (defaults to any) to dest_dir/ (defaults to current)
 
 `$ ./lzwarc l archivename [pref1 pref2 ...]`
 
--- list items to which internal path begins with one of given prefixes (defaults to any)
+-- list contents to which internal path begins with one of given prefixes (defaults to any)
