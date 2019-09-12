@@ -12,9 +12,9 @@ Usage:
 
 `$ ./lzwarc x archivename [dest_path/ [pref1 pref2 ...]]`
 
-`$ ./lzwarc xp password archivename [dest_path/ [pref1 pref2 ...]]`
+`$ ./lzwarc xp password archivename [dest_dir/ [pref1 pref2 ...]]`
 
--- extract items to which internal path begins with one of given prefixes (defaults to any) to dest_path/ (defaults to current directory)
+-- extract items to which internal path begins with one of given prefixes (defaults to any) to dest_dir/ (defaults to current)
 
 `$ ./lzwarc l archivename [pref1 pref2 ...]`
 
