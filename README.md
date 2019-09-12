@@ -10,7 +10,7 @@ Usage:
 
  -- add listed items (files/directories) to archive
 
-`$ ./lzwarc x archivename [dest_path/ [pref1 pref2 ...]]`
+`$ ./lzwarc x archivename [dest_dir/ [pref1 pref2 ...]]`
 
 `$ ./lzwarc xp password archivename [dest_dir/ [pref1 pref2 ...]]`
 
