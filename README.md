@@ -1,4 +1,4 @@
-## Archiver with LZW-compression
+## Archiver with LZW compression
 
 Linux only yet...
 
