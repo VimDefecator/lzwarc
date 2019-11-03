@@ -19,3 +19,5 @@ Usage:
 `$ ./lzwarc l archivename [pref1 pref2 ...]`
 
 -- list contents to which internal path begins with one of given prefixes (defaults to any)
+
+Underscored one is the multithreaded version.
