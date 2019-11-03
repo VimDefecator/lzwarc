@@ -66,7 +66,7 @@ void archive(char **ppath, char *key)
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
     void *args[NARGS];
-    args[QUEUE] = queue_new(1000);
+    args[QUEUE] = queue_new(100);
     args[FARC]  = fopen(*ppath++, "ab");
     args[KEY]   = key;
     args[MUTEX] = &mutex;
@@ -153,7 +153,7 @@ void extract(char **ppath, char *key)
 
     if (*ppath) ++ppath;
 
-    void *queue = queue_new(1000);
+    void *queue = queue_new(100);
 
     pthread_t thr[NTHR];
     for (int i = 0; i < NTHR; ++i)
