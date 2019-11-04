@@ -20,7 +20,9 @@ int dict_find(dict_t *, int, int);
 void lzw_encode(FILE *in, FILE *out)
 {
     dict_t *dict = dict_new();
-    void *bout = bopen(out);
+
+    bitio_t bout = BITIO_INIT;
+    bout.file = out;
 
     for (int prev, next, ch = 0, nbits = 9, stop = 0x100; ch != EOF; )
     {
@@ -29,26 +31,27 @@ void lzw_encode(FILE *in, FILE *out)
             EOF != (ch = fgetc(in)) &&
              -1 != (next = dict_find(dict, prev, ch)); );
         if (prev >= stop) {
-            bput(bout, stop, nbits);
+            bput(&bout, stop, nbits);
             ++nbits;
             stop <<= 1;
         }
-        bput(bout, prev, nbits);
+        bput(&bout, prev, nbits);
         dict_add(dict, prev, ungetc(ch, in));
     }
-    bflush(bout);
+    bflush(&bout);
 
-    free(bout);
     dict_free(dict);
 }
 
 void lzw_decode(FILE *in, FILE *out)
 {
     dict_t *dict = dict_new();
-    void *bin = bopen(in);
+
+    bitio_t bin = BITIO_INIT;
+    bin.file = in;
 
     for(int prev = -1, suff, next, nbits = 9, stop = 0x100;
-        -1 != bget(bin, &next, nbits);
+        -1 != bget(&bin, &next, nbits);
         prev = next)
     {
         if (next == stop) {
@@ -72,7 +75,6 @@ void lzw_decode(FILE *in, FILE *out)
             dict_add(dict, prev, suff);
     }
 
-    free(bin);
     dict_free(dict);
 }
 

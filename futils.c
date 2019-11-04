@@ -18,15 +18,22 @@ FILE *fopen_mkdir(char *path, char *mode)
 
 void fcopy(FILE *dst, FILE *src, size_t nbytes)
 {
-    while (nbytes--) fputc(fgetc(src), dst);
+    char buf[0x4000];
+
+    while (nbytes > sizeof(buf))
+        nbytes -= fwrite(buf, 1, fread(buf, 1, sizeof(buf), src), dst);
+    while (nbytes)
+        nbytes -= fwrite(buf, 1, fread(buf, 1, nbytes, src), dst);
 }
 
 void fxor(FILE *dst, FILE *src, size_t nbytes, char *key)
 {
-    if (key == NULL) return fcopy(dst, src, nbytes);
-
-    size_t klen = strlen(key);
-    while (nbytes--) fputc(fgetc(src)^key[nbytes%klen], dst);
+    if (key) {
+        size_t klen = strlen(key);
+        while (nbytes--) fputc(fgetc(src)^key[nbytes%klen], dst);
+    } else {
+        fcopy(dst, src, nbytes);
+    }
 }
 
 void fputs0(char *str, FILE *file)
