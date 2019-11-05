@@ -38,12 +38,12 @@ void htbl_free(void *_this, void (*item_free)(void *))
 void **htbl_find_(void *_this, void *item)
 {
     htbl_t *this = _this;
-    int h, i, j;
     void **pdel = NULL;
+    int i, j;
 
-    for (i = this->hash(item, this->sz), h = i ? i : 1, j = this->sz;
-         j && this->ptr[i];
-         --j, i = (i+h) % this->sz)
+    for (i = this->hash(item, this->sz), j = 1;
+         j != this->sz && this->ptr[i];
+         i = (i+j)%this->sz, j += 2)
     {
         if (this->ptr[i] == &this->deleted)
             if (!pdel) pdel = &this->ptr[i]; else;
@@ -51,9 +51,9 @@ void **htbl_find_(void *_this, void *item)
             if (!this->cmp(this->ptr[i], item)) break;
     }
 
-    return !j ? pdel
-              : this->ptr[i] || !pdel ? &this->ptr[i]
-                                      : pdel;
+    return j >= this->sz ? pdel
+                         : this->ptr[i] || !pdel ? &this->ptr[i]
+                                                 : pdel;
 }
 
 void *htbl_find(void *_this, void *item)
