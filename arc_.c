@@ -70,6 +70,7 @@ int numcores()
     fcpuinfo = fopen("/proc/cpuinfo", "r");
     do fgets(line, sizeof(line), fcpuinfo);
         while (!strstr(line, "cpu cores"));
+    fclose(fcpuinfo);
 
     int ncores;
     sscanf(strchr(line, ':') + 1, "%d", &ncores);
