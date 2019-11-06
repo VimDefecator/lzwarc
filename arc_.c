@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <pthread.h>
 #include "diter.h"
 #include "futils.h"
@@ -19,12 +20,18 @@
     return 1;                                                                 \
 }
 
+int nthr;
+
+int numcores();
+
 void archive(char **ppath, char *key);
 void extract(char **ppath, char *key);
 void lstcont(char **ppath);
 
 int main(int argc, char **argv)
 {
+    nthr = numcores();
+
     if (argc < 3) USAGE;
 
     switch (argv[1][0]) {
@@ -55,7 +62,19 @@ int main(int argc, char **argv)
     }
 }
 
-#define NTHR 2
+int numcores()
+{
+    FILE *fcpuinfo;
+    char line[0x1000];
+    
+    fcpuinfo = fopen("/proc/cpuinfo", "r");
+    do fgets(line, sizeof(line), fcpuinfo);
+        while (!strstr(line, "cpu cores"));
+
+    int ncores;
+    sscanf(strchr(line, ':') + 1, "%d", &ncores);
+    return ncores;
+}
 
 enum { QUEUE, FARC, KEY, MUTEX, NARGS };
 
@@ -71,8 +90,8 @@ void archive(char **ppath, char *key)
     args[KEY]   = key;
     args[MUTEX] = &mutex;
 
-    pthread_t thr[NTHR];
-    for (int i = 0; i < NTHR; ++i)
+    pthread_t thr[nthr];
+    for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, parchive, args);
 
     for (; *ppath; ++ppath)
@@ -86,10 +105,10 @@ void archive(char **ppath, char *key)
         dclose(diter);
     }
 
-    for (int i = 0; i < NTHR; ++i)
+    for (int i = 0; i < nthr; ++i)
         queue_put(args[QUEUE], NULL);
 
-    for (int i = 0; i < NTHR; ++i)
+    for (int i = 0; i < nthr; ++i)
         pthread_join(thr[i], NULL);
 
     fclose(args[FARC]);
@@ -155,8 +174,8 @@ void extract(char **ppath, char *key)
 
     void *queue = queue_new(100);
 
-    pthread_t thr[NTHR];
-    for (int i = 0; i < NTHR; ++i)
+    pthread_t thr[nthr];
+    for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, pextract, queue);
 
     while (fgets0(_path, farc), *_path)
@@ -191,10 +210,10 @@ void extract(char **ppath, char *key)
         else fseek(farc, sz_, SEEK_CUR);
     }
 
-    for (int i = 0; i < NTHR; ++i)
+    for (int i = 0; i < nthr; ++i)
         queue_put(queue, NULL);
 
-    for (int i = 0; i < NTHR; ++i)
+    for (int i = 0; i < nthr; ++i)
         pthread_join(thr[i], NULL);
 
     queue_free(queue);
