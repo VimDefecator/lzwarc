@@ -42,7 +42,7 @@ void **htbl_find_(void *_this, void *item)
     int i, j;
 
     for (i = this->hash(item, this->sz), j = 1;
-         j != this->sz && this->ptr[i];
+         j < this->sz && this->ptr[i];
          i = (i+j)%this->sz, j += 2)
     {
         if (this->ptr[i] == &this->deleted)
