@@ -16,8 +16,6 @@ Usage:
 
 -- extract files to which internal path begins with one of given prefixes (defaults to any) to dest_dir/ (defaults to current)
 
-`$ ./lzwarc l archivename [pref1 pref2 ...]`
+`$ ./lzwarc l archivename
 
--- list contents to which internal path begins with one of given prefixes (defaults to any)
-
-Underscored one is the multithreaded version.
+-- list contents
