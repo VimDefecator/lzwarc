@@ -7,6 +7,7 @@
 #include "futils.h"
 #include "lzw.h"
 #include "queue.h"
+#include "misc.h"
 
 #define USAGE {                                                               \
     fputs(                                                                    \
@@ -15,14 +16,12 @@
         "$ ./lzwarc ap password archivename item1 item2 ...\n"                \
         "$ ./lzwarc x archivename [dest_path/ [pref1 pref2 ...]]\n"           \
         "$ ./lzwarc xp password archivename [dest_path/ [pref1 pref2 ...]]\n" \
-        "$ ./lzwarc l archivename [pref1 pref2 ...]\n",                       \
+        "$ ./lzwarc l archivename\n",                                         \
         stderr);                                                              \
     return 1;                                                                 \
 }
 
 int nthr;
-
-int numcores();
 
 void archive(char **ppath, char *key);
 void extract(char **ppath, char *key);
@@ -185,9 +184,7 @@ void extract(char **ppath, char *key)
         fread(&sz, sizeof(uint32_t), 1, farc);
         fread(&sz_, sizeof(uint32_t), 1, farc);
 
-        char **pp;
-        for (pp = ppath; *pp && memcmp(_path, *pp, strlen(*pp)); ++pp);
-        if (*pp || !*ppath)
+        if (pstrstr_(ppath, _path))
         {
             FILE *dfile, *tfile;
             dfile = fopen_mkdir(dpath, "wb");
@@ -233,23 +230,65 @@ void *pextract(void *queue)
     }
 }
 
+int pitcmp(It *, It *);
+
+void rlstcont(It **, int, int);
+
 void lstcont(char **ppath)
 {
-    printf("original size | arhived size | path/filename\n"
-           "--------------|--------------|--------------\n");
+    Ls ls;
+    LsNew(ls);
 
-    FILE *farc = fopen(*ppath++, "rb");
-    for (char _path[PATH_MAX] = ""; fgets0(_path, farc), *_path; )
+    FILE *farc = fopen(*ppath, "rb");
+    for (char name[PATH_MAX] = ""; fgets0(name, farc), *name; )
     {
         uint32_t sz, sz_;
         fread(&sz, sizeof(uint32_t), 1, farc);
         fread(&sz_, sizeof(uint32_t), 1, farc);
 
-        char **pp;
-        for (pp = ppath; *pp && memcmp(_path, *pp, strlen(*pp)); ++pp);
-        if (*pp || !*ppath)
-            printf(" %12u | %12u | %s\n", sz, sz_, _path);
+        It it;
+        ItNew(it, name, sz, sz_);
+        LsAdd(ls, it);
+
         fseek(farc, sz_, SEEK_CUR);
     }
     fclose(farc);
+
+    qsort(ls, LsSize(ls), sizeof(*ls), pitcmp);
+    LsAdd(ls, NULL);
+
+    It *pit = &ls[0];
+    rlstcont(&pit, 0, 0);
+
+    for (int i = 0; i < LsSize(ls) - 1; ++i) free(ls[i]);
+    LsFree(ls);
+}
+
+void rlstcont(It **ppit, int lind, int lpref)
+{
+    static const char *ind = "  |   |   |   |   |   |   |   |   |   |   | "
+                             "  |   |   |   |   |   |   |   |   |   |   | "
+                             "  |   |   |   |   |   |   |   |   |   |   | ";
+
+    char *pref = ItName(**ppit);
+
+    for (; **ppit && !memcmp(ItName(**ppit), pref, lpref); ++*ppit)
+    {
+        fwrite(ind, 1, lind, stdout);
+
+        char *sl = strchr(ItName(**ppit) + lpref, '/');
+        if (sl++) {
+            int llpref = sl - (ItName(**ppit) + lpref);
+            fwrite(ItName(**ppit) + lpref, 1, llpref, stdout);
+            putchar('\n');
+            rlstcont(ppit, lind + 4, lpref + llpref);
+        } else {
+            puts(ItName(**ppit) + lpref);
+        }
+    }
+}
+
+int pitcmp(It *pit1, It *pit2)
+{
+    return strcmp(ItName(*pit1), ItName(*pit2));
 }
