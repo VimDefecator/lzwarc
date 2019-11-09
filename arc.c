@@ -23,6 +23,8 @@
 
 int nthr;
 
+int numcores();
+
 void archive(char **ppath, char *key);
 void extract(char **ppath, char *key);
 void lstcont(char **ppath);
@@ -98,9 +100,9 @@ void archive(char **ppath, char *key)
     {
         void *diter = dopen(*ppath);
 
-        for(char *fpath;
-            dnext(diter, fpath = malloc(PATH_MAX));
-            queue_put(args[QUEUE], fpath));
+        for(char fpath[PATH_MAX];
+            dnext(diter, fpath);
+            queue_put(args[QUEUE], strcpy(malloc(strlen(fpath)+1), fpath)));
 
         dclose(diter);
     }
