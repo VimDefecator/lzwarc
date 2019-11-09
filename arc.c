@@ -268,9 +268,9 @@ void lstcont(char **ppath)
 
 void rlstcont(It **ppit, int lind, int lpref)
 {
-    static const char *ind = "  |   |   |   |   |   |   |   |   |   |   | "
-                             "  |   |   |   |   |   |   |   |   |   |   | "
-                             "  |   |   |   |   |   |   |   |   |   |   | ";
+    static const char *ind = "| | | | | | | | | | | | | | | | | | | | | | | "
+                             "| | | | | | | | | | | | | | | | | | | | | | | "
+                             "| | | | | | | | | | | | | | | | | | | | | | | ";
 
     char *pref = ItName(**ppit);
 
@@ -283,9 +283,13 @@ void rlstcont(It **ppit, int lind, int lpref)
             int llpref = sl - (ItName(**ppit) + lpref);
             fwrite(ItName(**ppit) + lpref, 1, llpref, stdout);
             putchar('\n');
-            rlstcont(ppit, lind + 4, lpref + llpref);
+            rlstcont(ppit, lind + 2, lpref + llpref);
         } else {
-            puts(ItName(**ppit) + lpref);
+            printf("%-*s - %8u > %8u\n",
+                   57 - lind,
+                   ItName(**ppit) + lpref,
+                   ItSz(**ppit),
+                   ItSz_(**ppit));
         }
     }
 }
