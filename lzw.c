@@ -83,7 +83,7 @@ int entcmp(void *, void *);
 dict_t *dict_new()
 {
     dict_t *this = malloc(sizeof(dict_t));
-    this->ent = calloc(DICTSIZE, 2 * sizeof(int));
+    this->ent = calloc(DICTSIZE, 2 * sizeof(int16_t));
     this->nent = 0;
     this->htbl = htbl_new(33013, enthash, entcmp);
 
