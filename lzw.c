@@ -7,8 +7,7 @@
 enum { Prev, Suff };
 
 typedef struct {
-    int (*ent)[2];
-    int   nent;
+    int16_t (*ent)[2], nent;
     void *htbl;
 } dict_t;
 
@@ -79,7 +78,7 @@ void lzw_decode(FILE *in, FILE *out)
 }
 
 int enthash(void *, int);
-int entcmp(int *, int *);
+int entcmp(void *, void *);
 
 dict_t *dict_new()
 {
@@ -114,22 +113,20 @@ void dict_add(dict_t *this, int prev, int suff)
 
 int dict_find(dict_t *this, int prev, int suff)
 {
-    int ent[2];
+    int16_t ent[2];
     ent[Prev] = prev;
     ent[Suff] = suff;
 
-    int (*pent)[2] = htbl_find(this->htbl, ent);
+    int16_t (*pent)[2] = htbl_find(this->htbl, ent);
     return pent ? pent - this->ent : -1;
 }
 
 int enthash(void *ent, int rng)
 {
-    return memhash(ent, 2 * sizeof(int), rng);
+    return *(uint32_t *)ent % rng;
 }
 
-int entcmp(int *ent1, int *ent2)
+int entcmp(void *ent1, void *ent2)
 {
-    return ent1[Prev] - ent2[Prev]
-           ? ent1[Prev] - ent2[Prev]
-           : ent1[Suff] - ent2[Suff];
+    return *(uint32_t *)ent1 - *(uint32_t *)ent2;
 }
