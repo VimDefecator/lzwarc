@@ -296,5 +296,24 @@ void rlstcont(It **ppit, int lind, int lpref)
 
 int pitcmp(It *pit1, It *pit2)
 {
+    char *s1 = ItName(*pit1),
+         *s2 = ItName(*pit2),
+         *sl1, *sl2;
+
+    sl1 = strrchr(s1, '/');
+    sl1 = sl1 ? sl1+1 : s1+1;
+    sl2 = strrchr(s2, '/');
+    sl2 = sl2 ? sl2+1 : s2+1;
+
+    if (sl1 - s1 != sl2 - s2) {
+        int ret = -1;
+        if (sl1 - s1 < sl2 - s2) {
+            Swap(s1, s2);
+            Swap(sl1, sl2);
+            ret = 1;
+        }
+        if (!memcmp(s1, s2, sl2 - s2))
+            return ret;
+    }
     return strcmp(ItName(*pit1), ItName(*pit2));
 }

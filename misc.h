@@ -1,6 +1,12 @@
 #ifndef MISC_H
 #define MISC_H
 
+#define Swap(a,b) {     \
+    typeof(a) _t = (a); \
+    (a) = (b);          \
+    (b) = _t;           \
+}
+
 #define SZREALLOC 0x400
 
 typedef void ** Ls;
