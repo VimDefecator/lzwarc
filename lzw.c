@@ -1,6 +1,9 @@
 #include "lzw.h"
-#include "htbl.h"
 #include "bitio.h"
+
+#define HTBL_HASH(key, rng)     (*(uint32_t *)(key) % (rng))
+#define HTBL_EQUAL(key1, key2)  (*(uint32_t *)(key1) == *(uint32_t *)(key2))
+#include "htbl.h"
 
 #define DICTSIZE 0x4000
 
@@ -8,7 +11,7 @@ enum { Prev, Suff };
 
 typedef struct {
     int16_t (*ent)[2], nent;
-    void *htbl;
+    htbl_t htbl;
 } dict_t;
 
 dict_t *dict_new();
@@ -77,15 +80,12 @@ void lzw_decode(FILE *in, FILE *out)
     dict_free(dict);
 }
 
-int enthash(void *, int);
-int entcmp(void *, void *);
-
 dict_t *dict_new()
 {
     dict_t *this = malloc(sizeof(dict_t));
     this->ent = calloc(DICTSIZE, 2 * sizeof(int16_t));
     this->nent = 0;
-    this->htbl = htbl_new(33013, enthash, entcmp);
+    htbl_init(&this->htbl, 33013, NULL, NULL);
 
     unsigned char ch = 0;
     do dict_add(this, -1, ch); while (++ch);
@@ -95,7 +95,7 @@ dict_t *dict_new()
 
 void dict_free(dict_t *this)
 {
-    htbl_free(this->htbl, NULL);
+    htbl_free(&this->htbl, NULL);
     free(this->ent);
     free(this);
 }
@@ -106,7 +106,7 @@ void dict_add(dict_t *this, int prev, int suff)
 
     this->ent[this->nent][Prev] = prev;
     this->ent[this->nent][Suff] = suff;
-    htbl_add(this->htbl, this->ent[this->nent]);
+    htbl_add(&this->htbl, this->ent[this->nent]);
 
     ++this->nent;
 }
@@ -117,16 +117,6 @@ int dict_find(dict_t *this, int prev, int suff)
     ent[Prev] = prev;
     ent[Suff] = suff;
 
-    int16_t (*pent)[2] = htbl_find(this->htbl, ent);
+    int16_t (*pent)[2] = htbl_find(&this->htbl, ent);
     return pent ? pent - this->ent : -1;
-}
-
-int enthash(void *ent, int rng)
-{
-    return *(uint32_t *)ent % rng;
-}
-
-int entcmp(void *ent1, void *ent2)
-{
-    return *(uint32_t *)ent1 - *(uint32_t *)ent2;
 }
