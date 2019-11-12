@@ -272,25 +272,35 @@ void rlstcont(It **ppit, int lind, int lpref)
                              "| | | | | | | | | | | | | | | | | | | | | | | "
                              "| | | | | | | | | | | | | | | | | | | | | | | ";
 
-    char *pref = ItName(**ppit);
+    It *pit = *ppit;
+
+    char *pref = ItName(*pit);
 
     for (; **ppit && !memcmp(ItName(**ppit), pref, lpref); ++*ppit)
     {
-        fwrite(ind, 1, lind, stdout);
-
         char *sl = strchr(ItName(**ppit) + lpref, '/');
-        if (sl++) {
-            int llpref = sl - (ItName(**ppit) + lpref);
-            fwrite(ItName(**ppit) + lpref, 1, llpref, stdout);
-            putchar('\n');
-            rlstcont(ppit, lind + 2, lpref + llpref);
-        } else {
-            printf("%-*s - %8u > %8u\n",
-                   57 - lind,
-                   ItName(**ppit) + lpref,
-                   ItSz(**ppit),
-                   ItSz_(**ppit));
-        }
+        if (!sl++) continue;
+
+        fwrite(ind, 1, lind, stdout);
+        int llpref = sl - (ItName(**ppit) + lpref);
+        fwrite(ItName(**ppit) + lpref, 1, llpref, stdout);
+        putchar('\n');
+        rlstcont(ppit, lind + 2, lpref + llpref);
+    }
+
+    *ppit = pit;
+
+    for (; **ppit && !memcmp(ItName(**ppit), pref, lpref); ++*ppit)
+    {
+        char *sl = strchr(ItName(**ppit) + lpref, '/');
+        if (sl) continue;
+
+        fwrite(ind, 1, lind, stdout);
+        printf("%-*s - %8u > %8u\n",
+               57 - lind,
+               ItName(**ppit) + lpref,
+               ItSz(**ppit),
+               ItSz_(**ppit));
     }
 }
 
