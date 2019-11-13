@@ -4,18 +4,15 @@ Linux only yet...
 
 Usage:
 
-`$ ./lzwarc a archivename item1 item2 ...`
+`$ ./lzwarc [-p password] [-h] a <archive-name> <item1> ...`
 
-`$ ./lzwarc ap password archivename item1 item2 ...`
+-- create archive with the listed items (files/directories)
+-- `-h` selects Huffman encoder instead of LZW
 
- -- add listed items (files/directories) to archive
+`$ ./lzwarc [-p password] x <archive-name> [<dest-path> [<item1> ...]]`
 
-`$ ./lzwarc x archivename [dest_dir/ [pref1 pref2 ...]]`
+-- extract from archive to <dest-path> (default: ./) the listed items (default: all)
 
-`$ ./lzwarc xp password archivename [dest_dir/ [pref1 pref2 ...]]`
-
--- extract files to which internal path begins with one of given prefixes (defaults to any) to dest_dir/ (defaults to current)
-
-`$ ./lzwarc l archivename`
+`$ ./lzwarc l <arhive-name>`
 
 -- list contents
