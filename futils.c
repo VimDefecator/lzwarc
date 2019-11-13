@@ -9,10 +9,7 @@
 
 FILE *fopen_mkdir(char *path, char *mode)
 {
-    for(char *p = *path=='/' ? path+1 : path;
-        p = strchr(p, '/');
-        ++p)
-    {
+    for (char *p = path+1; p = strchr(p, '/'); ++p) {
         *p = '\0';
         mkdir(path, 0777);
         *p = '/';
