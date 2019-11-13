@@ -257,6 +257,7 @@ void lstcont(char **ppath)
     LsNew(ls);
 
     FILE *farc = fopen(*ppath, "rb");
+    fgetc(farc);
     for (char name[PATH_MAX] = ""; fgets0(name, farc), *name; )
     {
         uint32_t sz, sz_;
