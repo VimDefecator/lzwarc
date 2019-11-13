@@ -5,63 +5,61 @@
 #include <pthread.h>
 #include <linux/limits.h>
 
-#include "diter.h"
-#include "futils.h"
 #include "lzw.h"
+#include "huffman.h"
+#include "futils.h"
+#include "diter.h"
 #include "queue.h"
 #include "misc.h"
 
-#define USAGE {                                                               \
-    fputs(                                                                    \
-        "usage:\n"                                                            \
-        "$ ./lzwarc a archivename item1 item2 ...\n"                          \
-        "$ ./lzwarc ap password archivename item1 item2 ...\n"                \
-        "$ ./lzwarc x archivename [dest_path/ [pref1 pref2 ...]]\n"           \
-        "$ ./lzwarc xp password archivename [dest_path/ [pref1 pref2 ...]]\n" \
-        "$ ./lzwarc l archivename\n",                                         \
-        stderr);                                                              \
-    return 1;                                                                 \
-}
+char *strusage =
+    "usage:\n"
+    "$ ./lzwarc [-p password] [-h] a <archive-name> <item1> ...\n"
+    "$ ./lzwarc [-p password] x <archive-name> [<dest-path> [<item1> ...]]\n"
+    "$ ./lzwarc l <arhive-name>\n";
+
+enum { ALGO_LZW, ALGO_HUFFMAN };
 
 int nthr;
-
 int numcores();
 
-void archive(char **ppath, char *key);
+void archive(char **ppath, char *key, char algo);
 void extract(char **ppath, char *key);
 void lstcont(char **ppath);
 
 int main(int argc, char **argv)
 {
+    if (argc == 1) {
+        fputs(strusage, stderr);
+        return -1;
+    }
+
     nthr = numcores();
 
-    if (argc < 3) USAGE;
+    char *key = NULL;
+    char algo = ALGO_LZW;
 
-    switch (argv[1][0]) {
-        case 'a':
-            if (argv[1][1] == 'p') {
-                if (argc < 5) USAGE;
-                archive(argv+3, argv[2]);
-                break;
-            } else {
-                if (argc < 4) USAGE;
-                archive(argv+2, NULL);
-                break;
-            }
-        case 'x':
-            if (argv[1][1] == 'p') {
-                if (argc < 4) USAGE;
-                extract(argv+3, argv[2]);
-                break;
-            } else {
-                extract(argv+2, NULL);
-                break;
-            }
-        case 'l':
-            lstcont(argv+2);
+    while ((*++argv)[0] == '-') {
+        switch ((*argv)[1]) {
+        case 'p':
+            key = *++argv;
             break;
-        default:
-            USAGE;
+        case 'h':
+            algo = ALGO_HUFFMAN;
+            break;
+        }
+    }
+
+    switch ((*argv)[0]) {
+    case 'a':
+        archive(argv+1, key, algo);
+        break;
+    case 'x':
+        extract(argv+1, key);
+        break;
+    case 'l':
+        lstcont(argv+1);
+        break;
     }
 }
 
@@ -80,21 +78,34 @@ int numcores()
     return ncores;
 }
 
+void (*encoders[])(FILE*,FILE*) = { lzw_encode, huffman_encode },
+     (*decoders[])(FILE*,FILE*) = { lzw_decode, huffman_decode },
+     (*encode)(FILE*,FILE*),
+     (*decode)(FILE*,FILE*);
+
 enum { QUEUE, FARC, KEY, MUTEX, NARGS };
 
 void *parchive(void *);
 
-void archive(char **ppath, char *key)
+void archive(char **ppath, char *key, char algo)
 {
+    pthread_t thr[nthr];
+    void *args[NARGS];
+    void *queue;
+    FILE *farc;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    void *args[NARGS];
-    args[QUEUE] = queue_new(100);
-    args[FARC]  = fopen(*ppath++, "ab");
+    queue = queue_new(100);
+    farc = fopen(*ppath++, "wb");
+    fwrite(&algo, 1, 1, farc);
+
+    args[QUEUE] = queue;
+    args[FARC]  = farc;
     args[KEY]   = key;
     args[MUTEX] = &mutex;
 
-    pthread_t thr[nthr];
+    encode = encoders[algo];
+
     for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, parchive, args);
 
@@ -137,7 +148,7 @@ void *parchive(void *args)
         if (!file) continue;
 
         tfile = tmpfile();
-        lzw_encode(tfile, file);
+        encode(tfile, file);
         sz = ftell(file);
         sz_ = ftell(tfile);
         if (sz_ < sz) {
@@ -162,25 +173,27 @@ void *parchive(void *args)
     }
 }
 
-enum { TFILE, DFILE };
+enum { DFILE, TFILE };
 
 void *pextract(void *);
 
 void extract(char **ppath, char *key)
 {
-    FILE *farc = fopen(*ppath++, "rb");
-
-    char dpath[PATH_MAX], *_path;
-    strcpy(dpath, *ppath ? *ppath : "");
-    _path = dpath + strlen(dpath);
-
-    if (*ppath) ++ppath;
-
-    void *queue = queue_new(100);
-
     pthread_t thr[nthr];
+    void *queue;
+    FILE *farc;
+    char dpath[PATH_MAX], *_path;
+
+    queue = queue_new(100);
+    farc = fopen(*ppath++, "rb");
+    decode = decoders[fgetc(farc)];
+
     for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, pextract, queue);
+
+    strcpy(dpath, *ppath ? *ppath : "");
+    _path = dpath + strlen(dpath);
+    if (*ppath) ++ppath;
 
     while (fgets0(_path, farc), *_path)
     {
@@ -199,8 +212,8 @@ void extract(char **ppath, char *key)
                 rewind(tfile);
 
                 void **item = malloc(2 * sizeof(void *));
-                item[TFILE] = tfile;
                 item[DFILE] = dfile;
+                item[TFILE] = tfile;
                 queue_put(queue, item);
             }
             else
@@ -226,10 +239,10 @@ void *pextract(void *queue)
 {
     for (void **item; item = queue_take(queue); )
     {
-        lzw_decode(item[DFILE], item[TFILE]);
+        decode(item[DFILE], item[TFILE]);
 
-        fclose(item[TFILE]);
         fclose(item[DFILE]);
+        fclose(item[TFILE]);
         free(item);
     }
 }
