@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <pthread.h>
+#include <linux/limits.h>
+
 #include "diter.h"
 #include "futils.h"
 #include "lzw.h"
@@ -135,7 +137,7 @@ void *parchive(void *args)
         if (!file) continue;
 
         tfile = tmpfile();
-        lzw_encode(file, tfile);
+        lzw_encode(tfile, file);
         sz = ftell(file);
         sz_ = ftell(tfile);
         if (sz_ < sz) {
@@ -224,7 +226,7 @@ void *pextract(void *queue)
 {
     for (void **item; item = queue_take(queue); )
     {
-        lzw_decode(item[TFILE], item[DFILE]);
+        lzw_decode(item[DFILE], item[TFILE]);
 
         fclose(item[TFILE]);
         fclose(item[DFILE]);

@@ -1,5 +1,9 @@
-#include "lzw.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
 #include "bitio.h"
+#include "lzw.h"
 
 #define HTBL_HASH(key, rng)     (*(uint32_t *)(key) % (rng))
 #define HTBL_EQUAL(key1, key2)  (*(uint32_t *)(key1) == *(uint32_t *)(key2))
@@ -51,19 +55,19 @@ inline void dict_free(dict_t *this)
     free(this->ent);
 }
 
-void lzw_encode(FILE *in, FILE *out)
+void lzw_encode(FILE *fdst, FILE *fsrc)
 {
     dict_t dict;
     dict_init(&dict);
 
     bitio_t bout = BITIO_INIT;
-    bout.file = out;
+    bout.file = fdst;
 
-    for (int prev, next, ch = 0, nbits = 9, stop = 0x100; ch != EOF; )
+    for (uint64_t prev, next, ch = 0, nbits = 9, stop = 0x100; ch != EOF; )
     {
         for(next = -1;
             prev = next,
-            EOF != (ch = fgetc(in)) &&
+            EOF != (ch = fgetc(fsrc)) &&
              -1 != (next = dict_find(&dict, prev, ch)); );
         if (prev >= stop) {
             bput(&bout, stop, nbits);
@@ -71,22 +75,22 @@ void lzw_encode(FILE *in, FILE *out)
             stop <<= 1;
         }
         bput(&bout, prev, nbits);
-        dict_add(&dict, prev, ungetc(ch, in));
+        dict_add(&dict, prev, ungetc(ch, fsrc));
     }
     bflush(&bout);
 
     dict_free(&dict);
 }
 
-void lzw_decode(FILE *in, FILE *out)
+void lzw_decode(FILE *fdst, FILE *fsrc)
 {
     dict_t dict;
     dict_init(&dict);
 
     bitio_t bin = BITIO_INIT;
-    bin.file = in;
+    bin.file = fsrc;
 
-    for(int prev = -1, suff, next, nbits = 9, stop = 0x100;
+    for(uint64_t prev = -1, suff, next, nbits = 9, stop = 0x100;
         -1 != bget(&bin, &next, nbits);
         prev = next)
     {
@@ -105,7 +109,7 @@ void lzw_decode(FILE *in, FILE *out)
         do buf[--pos] = dict.ent[curr][Suff], ++len;
             while(-1 != (curr = dict.ent[curr][Prev]));
 
-        fwrite(buf+pos, 1, len, out);
+        fwrite(buf+pos, 1, len, fdst);
         suff = buf[pos];
         if (!add && prev != -1)
             dict_add(&dict, prev, suff);

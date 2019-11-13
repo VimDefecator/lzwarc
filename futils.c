@@ -1,17 +1,21 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+
 #include "futils.h"
 
 FILE *fopen_mkdir(char *path, char *mode)
 {
-    for(char *p = path+1, *q;
-        q = strchr(p, '/');
-        p = q + 1)
+    for(char *p = *path=='/' ? path+1 : path;
+        p = strchr(p, '/');
+        ++p)
     {
-        *q = '\0';
-        struct stat s = { 0 };
-        stat(path, &s);
-        if (!S_ISDIR(s.st_mode))
-            mkdir(path, 0777);
-        *q = '/';
+        *p = '\0';
+        mkdir(path, 0777);
+        *p = '/';
     }
     return fopen(path, mode);
 }
