@@ -96,8 +96,17 @@ void archive(char **ppath, char *key, char algo)
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
     queue = queue_new(100);
-    farc = fopen(*ppath++, "wb");
-    fwrite(&algo, 1, 1, farc);
+
+    farc = fopen(*ppath, "rb");
+    if (farc) {
+        algo = fgetc(farc);
+        fclose(farc);
+        farc = fopen(*ppath, "ab");
+    } else {
+        farc = fopen(*ppath, "wb");
+        fwrite(&algo, 1, 1, farc);
+    }
+    ++ppath;
 
     args[QUEUE] = queue;
     args[FARC]  = farc;
