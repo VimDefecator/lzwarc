@@ -12,7 +12,7 @@ Usage:
 
 `$ ./lzwarc [-p password] x <archive-name> [<dest-path> [<item1> ...]]`
 
--- extract from archive to <dest-path> (default: ./) the listed items (default: all)
+-- extract from archive to dest-path (default: ./) the listed items (default: all)
 
 `$ ./lzwarc l <arhive-name>`
 
