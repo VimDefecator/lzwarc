@@ -21,18 +21,19 @@ typedef void ** Ls;
 
 #define LsFree(this) free(&LsSize(this))
 
-typedef void * It;
+typedef char * It;
 
-#define ItSz(this)           (((uint32_t *)(this))[0])
-#define ItSz_(this)          (((uint32_t *)(this))[1])
-#define ItName(this) ((char *)((uint32_t *)(this) +2))
+#define ItInt1(this) (((int *)(this))[-1])
+#define ItInt2(this) (((int *)(this))[-2])
 
-#define ItNew(this, name, sz, sz_) {                        \
-    (this) = malloc(2*sizeof(uint32_t) + strlen(name)+1);   \
-    ItSz(this) = (sz);                                      \
-    ItSz_(this) = (sz_);                                    \
-    strcpy(ItName(this), name);                             \
+#define ItInit(this, str, i1, i2) {                             \
+    (this) = (int *)malloc(2*sizeof(int) + strlen(str)+1) + 2;  \
+    ItInt1(this) = (i1);                                        \
+    ItInt2(this) = (i2);                                        \
+    strcpy(this, str);                                          \
 }
+
+#define ItFree(this) free(&ItInt2(this))
 
 inline char *pstrstr_(char **pstr, char *str_)
 {

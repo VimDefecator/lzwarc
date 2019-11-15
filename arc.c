@@ -120,23 +120,28 @@ void archive(char **ppath, char *key, char algo)
 
     for (; *ppath; ++ppath)
     {
+        char *sl = strrchr(*ppath, '/');
+        sl = sl ? sl+1 : *ppath;
+
         void *diter = dopen(*ppath);
-
         for(char fpath[PATH_MAX];
-            dnext(diter, fpath);
-            queue_put(args[QUEUE], strcpy(malloc(strlen(fpath)+1), fpath)));
-
+            dnext(diter, fpath); )
+        {
+            It item;
+            ItInit(item, fpath, sl-*ppath, 0);
+            queue_put(queue, item);
+        }
         dclose(diter);
     }
 
     for (int i = 0; i < nthr; ++i)
-        queue_put(args[QUEUE], NULL);
+        queue_put(queue, NULL);
 
     for (int i = 0; i < nthr; ++i)
         pthread_join(thr[i], NULL);
 
-    fclose(args[FARC]);
-    queue_free(args[QUEUE]);
+    fclose(farc);
+    queue_free(queue);
 
     pthread_mutex_destroy(&mutex);
 }
@@ -148,12 +153,12 @@ void *parchive(void *args)
     char            *key    = (char            *)((void **)args)[KEY  ];
     pthread_mutex_t *pmutex = (pthread_mutex_t *)((void **)args)[MUTEX];
 
-    for (char *fpath; fpath = queue_take(queue); )
+    for (It item; item = queue_take(queue); ItFree(item))
     {
         FILE *file, *tfile;
         uint32_t sz, sz_;
 
-        file = fopen(fpath, "rb");
+        file = fopen(item, "rb");
         if (!file) continue;
 
         tfile = tmpfile();
@@ -171,7 +176,7 @@ void *parchive(void *args)
 
         pthread_mutex_lock(pmutex);
 
-        fputs0(fpath, farc);
+        fputs0(item + ItInt1(item), farc);
         fwrite(&sz, sizeof(uint32_t), 1, farc);
         fwrite(&sz_, sizeof(uint32_t), 1, farc);
         fxor(farc, file, sz_, key);
@@ -274,7 +279,7 @@ void lstcont(char **ppath)
         fread(&sz_, sizeof(uint32_t), 1, farc);
 
         It it;
-        ItNew(it, name, sz, sz_);
+        ItInit(it, name, sz, sz_);
         LsAdd(ls, it);
 
         fseek(farc, sz_, SEEK_CUR);
@@ -287,7 +292,7 @@ void lstcont(char **ppath)
     It *pit = &ls[0];
     rlstcont(&pit, 0, 0);
 
-    for (int i = 0; i < LsSize(ls) - 1; ++i) free(ls[i]);
+    for (int i = 0; i < LsSize(ls) - 1; ++i) ItFree(ls[i]);
     LsFree(ls);
 }
 
@@ -299,37 +304,37 @@ void rlstcont(It **ppit, int lind, int lpref)
 
     It *pit = *ppit;
 
-    char *pref = ItName(*pit);
+    char *pref = *pit;
 
-    for (; **ppit && !memcmp(ItName(**ppit), pref, lpref); ++*ppit)
+    for (; **ppit && !memcmp(**ppit, pref, lpref); ++*ppit)
     {
-        char *sl = strchr(ItName(**ppit) + lpref, '/');
+        char *sl = strchr(**ppit + lpref, '/');
         if (!sl++) continue;
 
         fwrite(ind, 1, lind, stdout);
-        int llpref = sl - (ItName(**ppit) + lpref);
-        fwrite(ItName(**ppit) + lpref, 1, llpref, stdout);
+        int llpref = sl - (**ppit + lpref);
+        fwrite(**ppit + lpref, 1, llpref, stdout);
         putchar('\n');
         rlstcont(ppit, lind + 2, lpref + llpref);
     }
 
     *ppit = pit;
 
-    for (; **ppit && !memcmp(ItName(**ppit), pref, lpref); ++*ppit)
+    for (; **ppit && !memcmp(**ppit, pref, lpref); ++*ppit)
     {
-        char *sl = strchr(ItName(**ppit) + lpref, '/');
+        char *sl = strchr(**ppit + lpref, '/');
         if (sl) continue;
 
         fwrite(ind, 1, lind, stdout);
         printf("%-*s - %8u > %8u\n",
                57 - lind,
-               ItName(**ppit) + lpref,
-               ItSz(**ppit),
-               ItSz_(**ppit));
+               **ppit + lpref,
+               ItInt1(**ppit),
+               ItInt2(**ppit));
     }
 }
 
 int pitcmp(It *pit1, It *pit2)
 {
-    return strcmp(ItName(*pit1), ItName(*pit2));
+    return strcmp(*pit1, *pit2);
 }
