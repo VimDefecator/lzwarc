@@ -5,9 +5,9 @@
 
 typedef void ** Ls;
 
-#define LsSize(this) (((int *)(this))[-1])
+#define LsNew ((int *)calloc(1, sizeof(int )) + 1)
 
-#define LsNew(this) ((this) = (int *)malloc(sizeof(int )) + 1)
+#define LsSize(this) (((int *)(this))[-1])
 
 #define LsAdd(this, item) {                                                 \
     if (LsSize(this) % SZREALLOC == 0) {                                    \

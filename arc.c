@@ -261,14 +261,13 @@ void *pextract(void *queue)
     }
 }
 
-int pitcmp(It *, It *);
+int pstrcmp(char **, char **);
 
 void rlstcont(It **, int, int);
 
 void lstcont(char **ppath)
 {
-    Ls ls;
-    LsNew(ls);
+    Ls ls = LsNew;
 
     FILE *farc = fopen(*ppath, "rb");
     fgetc(farc);
@@ -286,7 +285,7 @@ void lstcont(char **ppath)
     }
     fclose(farc);
 
-    qsort(ls, LsSize(ls), sizeof(*ls), pitcmp);
+    qsort(ls, LsSize(ls), sizeof(*ls), pstrcmp);
     LsAdd(ls, NULL);
 
     It *pit = &ls[0];
@@ -334,7 +333,7 @@ void rlstcont(It **ppit, int lind, int lpref)
     }
 }
 
-int pitcmp(It *pit1, It *pit2)
+int pstrcmp(char **pstr1, char **pstr2)
 {
-    return strcmp(*pit1, *pit2);
+    return strcmp(*pstr1, *pstr2);
 }
