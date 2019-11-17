@@ -99,10 +99,12 @@ void archive(char **ppath, char *key, char algo)
 
     farc = fopen(*ppath, "rb");
     if (farc) {
+        // arhive exists: detect previously used algo
         algo = fgetc(farc);
         fclose(farc);
         farc = fopen(*ppath, "ab");
     } else {
+        // new archive: specify algo in first byte
         farc = fopen(*ppath, "wb");
         fwrite(&algo, 1, 1, farc);
     }
@@ -115,11 +117,19 @@ void archive(char **ppath, char *key, char algo)
 
     encode = encoders[algo];
 
+    // create multiple threads and feed them with jobs via queue
     for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, parchive, args);
 
     for (; *ppath; ++ppath)
     {
+        // diter recursively returns paths to all underlying files, if a
+        // directory is specified, or a single file - same as given
+
+        // full path is needed to open a file, but only subdirectories
+        // hierarchy of every separately specified item should be preserved in
+        // the resulting archive, so strings with prefix lengths are pushed
+
         char *sl = strrchr(*ppath, '/');
         sl = sl ? sl+1 : *ppath;
 
@@ -134,6 +144,7 @@ void archive(char **ppath, char *key, char algo)
         dclose(diter);
     }
 
+    // tell the threads to terminate by feeding each one with a NULL
     for (int i = 0; i < nthr; ++i)
         queue_put(queue, NULL);
 
@@ -161,6 +172,9 @@ void *parchive(void *args)
         file = fopen(item, "rb");
         if (!file) continue;
 
+        // send encoder output to temporary file and write it to archive only
+        // if the size was succesfully reduced, otherwise copy the source one
+
         tfile = tmpfile();
         encode(tfile, file);
         sz = ftell(file);
@@ -180,6 +194,7 @@ void *parchive(void *args)
         fwrite(&sz, sizeof(uint32_t), 1, farc);
         fwrite(&sz_, sizeof(uint32_t), 1, farc);
         fxor(farc, file, sz_, key);
+        // fxor calls fcopy, if key is NULL
 
         pthread_mutex_unlock(pmutex);
 
@@ -217,6 +232,9 @@ void extract(char **ppath, char *key)
 
         if (!*ppath || pstrstr_(ppath, _path))
         {
+            // fopen_mkdir opens new file under specified path,
+            // creating all the missing directories along it
+
             FILE *dfile, *tfile;
             dfile = fopen_mkdir(dpath, "wb");
             if (sz_ < sz)
@@ -235,6 +253,7 @@ void extract(char **ppath, char *key)
                 fxor(dfile, farc, sz_, key);
                 fclose(dfile);
             }
+            // delegate only decoder-involved extracting to parallel threads
         }
         else fseek(farc, sz_, SEEK_CUR);
     }
@@ -260,6 +279,11 @@ void *pextract(void *queue)
         free(item);
     }
 }
+
+// lstcont collects all paths from archive to memory, sorts lexicographically
+// and invokes recursive subroutine, which goes through the list via common
+// pointer-to-pointer, twice per segment on each level for directories-first
+// ordering, and does all the indentation
 
 int pstrcmp(char **, char **);
 
