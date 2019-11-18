@@ -4,11 +4,11 @@ Linux only yet...
 
 Installation:
 
-`
+```
 $ make
 
 $ ./install.sh
-`
+```
 
 Usage:
 
