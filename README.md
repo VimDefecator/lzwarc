@@ -6,7 +6,6 @@ Installation:
 
 ```
 $ make
-
 $ ./install.sh
 ```
 
