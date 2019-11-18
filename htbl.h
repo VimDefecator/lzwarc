@@ -21,9 +21,9 @@ typedef struct htbl {
     int    deleted;
 } htbl_t;
 
-inline void htbl_init(htbl_t *this, int sz,
-                      int (*hash)(void *, int),
-                      int (*equal)(void *, void *))
+static inline void htbl_init(htbl_t *this, int sz,
+                             int (*hash)(void *, int),
+                             int (*equal)(void *, void *))
 {
     this->ptr = calloc(sz, sizeof(void *));
     this->sz = sz;
@@ -31,7 +31,7 @@ inline void htbl_init(htbl_t *this, int sz,
     this->equal = equal;
 }
 
-inline void htbl_free(htbl_t *this, void (*item_free)(void *))
+static inline void htbl_free(htbl_t *this, void (*item_free)(void *))
 {
     if (item_free) {
         for (int i = 0; i < this->sz; ++i) {
@@ -43,7 +43,7 @@ inline void htbl_free(htbl_t *this, void (*item_free)(void *))
     free(this->ptr);
 }
 
-inline void **htbl_find_(htbl_t *this, void *item)
+static inline void **htbl_find_(htbl_t *this, void *item)
 {
     void **pdel = NULL;
     int i, j;
@@ -63,14 +63,14 @@ inline void **htbl_find_(htbl_t *this, void *item)
                                                  : pdel;
 }
 
-inline void *htbl_find(htbl_t *this, void *item)
+static inline void *htbl_find(htbl_t *this, void *item)
 {
     void **pptr = htbl_find_(this, item);
     return pptr && *pptr != &this->deleted ? *pptr
                                            : NULL;
 }
 
-inline int htbl_add(htbl_t *this, void *item)
+static inline int htbl_add(htbl_t *this, void *item)
 {
     void **pptr = htbl_find_(this, item);
     if (!pptr)
@@ -80,7 +80,7 @@ inline int htbl_add(htbl_t *this, void *item)
     return 0;
 }
 
-inline void htbl_del(htbl_t *this, void *item)
+static inline void htbl_del(htbl_t *this, void *item)
 {
     void **pptr = htbl_find_(this, item);
     if (pptr && *pptr) *pptr = &this->deleted;

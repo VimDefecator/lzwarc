@@ -35,7 +35,7 @@ typedef char * It;
 
 #define ItFree(this) free(&ItInt2(this))
 
-inline char *pstrstr_(char **pstr, char *str_)
+static inline char *pstrstr_(char **pstr, char *str_)
 {
     for (; *pstr; ++pstr)
     {

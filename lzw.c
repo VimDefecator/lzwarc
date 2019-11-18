@@ -18,7 +18,7 @@ typedef struct {
     htbl_t htbl;
 } dict_t;
 
-inline void dict_add(dict_t *this, int prev, int suff)
+static inline void dict_add(dict_t *this, int prev, int suff)
 {
     if (this->nent == DICTSIZE) return;
 
@@ -29,7 +29,7 @@ inline void dict_add(dict_t *this, int prev, int suff)
     ++this->nent;
 }
 
-inline int dict_find(dict_t *this, int prev, int suff)
+static inline int dict_find(dict_t *this, int prev, int suff)
 {
     int16_t ent[2];
     ent[Prev] = prev;
@@ -39,7 +39,7 @@ inline int dict_find(dict_t *this, int prev, int suff)
     return pent ? pent - this->ent : -1;
 }
 
-inline void dict_init(dict_t *this)
+static inline void dict_init(dict_t *this)
 {
     this->ent = calloc(DICTSIZE, 2 * sizeof(int16_t));
     this->nent = 0;
@@ -49,7 +49,7 @@ inline void dict_init(dict_t *this)
     do dict_add(this, -1, ch); while (++ch);
 }
 
-inline void dict_free(dict_t *this)
+static inline void dict_free(dict_t *this)
 {
     htbl_free(&this->htbl, NULL);
     free(this->ent);

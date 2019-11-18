@@ -15,7 +15,7 @@ typedef struct {
 
 #define BITIO_INIT {NULL, 0, UINTWID, 0, 0}
 
-inline int bget(bitio_t *this, uint64_t *pbits, int nbits)
+static inline int bget(bitio_t *this, uint64_t *pbits, int nbits)
 {
     nbits = nbits <= UINTWID ? nbits : UINTWID;
     *pbits = (this->ipos < UINTWID)
@@ -38,7 +38,7 @@ inline int bget(bitio_t *this, uint64_t *pbits, int nbits)
         return 0;
 }
 
-inline void bput(bitio_t *this, uint64_t bits, int nbits)
+static inline void bput(bitio_t *this, uint64_t bits, int nbits)
 {
     nbits = nbits <= UINTWID ? nbits : UINTWID;
     if (nbits != UINTWID) bits &= (1 << nbits) - 1;
@@ -52,7 +52,7 @@ inline void bput(bitio_t *this, uint64_t bits, int nbits)
     this->obuf = this->opos ? bits >> (nbits - this->opos) : 0;
 }
 
-inline void bflush(bitio_t *this)
+static inline void bflush(bitio_t *this)
 {
     fwrite(&this->obuf, (this->opos+7)/8, 1, this->file);
     this->obuf = this->opos = 0;
