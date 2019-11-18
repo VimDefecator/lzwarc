@@ -4,9 +4,10 @@ Linux only yet...
 
 Installation:
 
-`$ make`
-
-`$ ./install.sh`
+``
+$ make
+$ ./install.sh
+``
 
 Usage:
 
