@@ -95,6 +95,8 @@ void archive(char **ppath, char *key, char algo)
     FILE *farc;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+    int szarc_, _szarc, nfiles = 0;
+
     queue = queue_new(100);
 
     farc = fopen(*ppath, "rb");
@@ -109,6 +111,8 @@ void archive(char **ppath, char *key, char algo)
         fwrite(&algo, 1, 1, farc);
     }
     ++ppath;
+
+    szarc_ = ftell(farc);
 
     args[QUEUE] = queue;
     args[FARC]  = farc;
@@ -135,7 +139,8 @@ void archive(char **ppath, char *key, char algo)
 
         void *diter = dopen(*ppath);
         for(char fpath[PATH_MAX];
-            dnext(diter, fpath); )
+            dnext(diter, fpath);
+            ++nfiles)
         {
             It item;
             ItInit(item, fpath, sl-*ppath, 0);
@@ -151,10 +156,16 @@ void archive(char **ppath, char *key, char algo)
     for (int i = 0; i < nthr; ++i)
         pthread_join(thr[i], NULL);
 
+    _szarc = ftell(farc);
+
     fclose(farc);
     queue_free(queue);
 
     pthread_mutex_destroy(&mutex);
+
+    printf("%d files added to archive\n"
+           "total compressed size: %d bytes\n",
+           nfiles, _szarc - szarc_);
 }
 
 void *parchive(void *args)
