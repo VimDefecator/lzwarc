@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <termios.h>
 #include <linux/limits.h>
 
 #include "lzw.h"
@@ -10,6 +12,7 @@
 #include "futils.h"
 #include "diter.h"
 #include "queue.h"
+#include "pathtree.h"
 #include "misc.h"
 
 char *strusage =
@@ -215,6 +218,8 @@ void *parchive(void *args)
 
 enum { DFILE, TFILE };
 
+Ls interact(FILE *farc);
+
 void *pextract(void *);
 
 void extract(char **ppath, char *key)
@@ -222,7 +227,6 @@ void extract(char **ppath, char *key)
     pthread_t thr[nthr];
     void *queue;
     FILE *farc;
-    char dpath[PATH_MAX], *_path;
 
     queue = queue_new(100);
     farc = fopen(*ppath++, "rb");
@@ -231,20 +235,27 @@ void extract(char **ppath, char *key)
     for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, pextract, queue);
 
+    char dpath[PATH_MAX], *_path;
     strcpy(dpath, *ppath ? *ppath : "");
     _path = dpath + strlen(dpath);
     if (*ppath) ++ppath;
 
-    while (fgets0(_path, farc), *_path)
+    if (*ppath && **ppath == '\0')
+        ppath = interact(farc);
+
+    if (ppath) for (char path[PATH_MAX], **_ppath; fgets0(path, farc), *path; )
     {
         uint32_t sz, sz_;
         fread(&sz, sizeof(uint32_t), 1, farc);
         fread(&sz_, sizeof(uint32_t), 1, farc);
 
-        if (!*ppath || pstrstr_(ppath, _path))
+        if (!*ppath || *(_ppath = pstrstr_(ppath, path)))
         {
             // fopen_mkdir opens new file under specified path,
             // creating all the missing directories along it
+
+            char *sl = strrchr(*_ppath, '/');
+            strcpy(_path, path + (sl ? sl+1 - *_ppath : 0));
 
             FILE *dfile, *tfile;
             dfile = fopen_mkdir(dpath, "wb");
@@ -326,7 +337,7 @@ void lstcont(char **ppath)
     It *pit = &ls[0];
     rlstcont(&pit, 0, 0);
 
-    for (int i = 0; i < LsSize(ls) - 1; ++i) ItFree(ls[i]);
+    Apply(ItFree, ls, LsSize(ls)-1);
     LsFree(ls);
 }
 
@@ -357,8 +368,7 @@ void rlstcont(It **ppit, int lind, int lpref)
     for (; **ppit && !memcmp(**ppit, pref, lpref); ++*ppit)
     {
         char *sl = strchr(**ppit + lpref, '/');
-        if (sl) continue;
-
+        if (sl) continue; 
         fwrite(ind, 1, lind, stdout);
         printf("%-*s - %8u > %8u\n",
                57 - lind,
@@ -371,4 +381,110 @@ void rlstcont(It **ppit, int lind, int lpref)
 int pstrcmp(char **pstr1, char **pstr2)
 {
     return strcmp(*pstr1, *pstr2);
+}
+
+// visual selection of files to extract
+
+Ls interact(FILE *farc)
+{
+    Ls paths = NULL;
+
+    pathtree_t *tree = pathtree_new(".", NULL);
+
+    for(char path[PATH_MAX];
+        fgets0(path, farc), *path;
+        pathtree_add(tree, path))
+    {
+        uint32_t sz, sz_;
+        fread(&sz, sizeof(uint32_t), 1, farc);
+        fread(&sz_, sizeof(uint32_t), 1, farc);
+        fseek(farc, sz_, SEEK_CUR);
+    }
+    pathtree_sort(tree);
+
+    pathtree_t *current = tree;
+    int scroll = 0, cursor = 0;
+    char path[PATH_MAX] = {};
+
+    struct termios oldt, newt;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON);
+    newt.c_lflag &= ~(ECHO);
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    printf("W - up, S - down, D - open, A - back, X - select, SPACE - done\n\n"
+           "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+
+    #define DISPLAY {                                                         \
+        printf("\e[21A");                                                     \
+        int i;                                                                \
+        for (i = scroll; i < scroll+20 && i < LsSize(current->child); ++i) {  \
+            printf("%c %-76s%c\n",                                            \
+                   i == cursor ? '>' : ' ',                                   \
+                   current->child[i]->name,                                   \
+                   current->child[i]->child ? '/' : ' ');                     \
+        }                                                                     \
+        for (; i < scroll+21; ++i) puts("\e[2K");                             \
+    }
+
+    DISPLAY;
+
+    for (int key; ' ' != (key = getchar()); )
+    {
+        switch (key) {
+        case 'W': case 'w':
+            if (cursor-1 >= 0) {
+                --cursor;
+                if (cursor < scroll)
+                    --scroll;
+                DISPLAY;
+            }
+            break;
+        case 'S': case 's':
+            if (cursor+1 < LsSize(current->child)) {
+                ++cursor;
+                if (cursor >= scroll + 20)
+                    ++scroll;
+                DISPLAY;
+            }
+            break;
+        case 'D': case 'd':
+            if (current->child[cursor]->child) {
+                current = current->child[cursor];
+                scroll = cursor = 0;
+                DISPLAY;
+                strcat(path, current->name);
+                strcat(path, "/");
+            }
+            break;
+        case 'A': case 'a':
+            if (current->parent) {
+                path[strlen(path)-strlen(current->name)-1] = '\0';
+                current = current->parent;
+                scroll = cursor = 0;
+                DISPLAY;
+            }
+            break;
+        case 'X': case 'x':
+            strcat(path, current->child[cursor]->name);
+            LsAdd(paths, strcpy(malloc(strlen(path)+1), path));
+            path[strlen(path)-strlen(current->child[cursor]->name)] = '\0';
+            printf("\e[1Amarked\n");
+            break;
+        }
+    }
+
+    #undef DISPLAY
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
+    pathtree_free(tree);
+
+    fseek(farc, 1, SEEK_SET);
+
+    if (paths) LsAdd(paths, NULL);
+    return paths;
 }

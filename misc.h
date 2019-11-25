@@ -1,7 +1,10 @@
 #ifndef MISC_H
 #define MISC_H
 
-#define SZREALLOC 0x400
+#include <stdlib.h>
+#include <string.h>
+
+#define SZREALLOC 0x40
 
 typedef void ** Ls;
 
@@ -10,6 +13,8 @@ typedef void ** Ls;
 #define LsSize(this) (((int *)(this))[-1])
 
 #define LsAdd(this, item) {                                                 \
+    if ((this) == NULL)                                                     \
+        (this) = LsNew;                                                     \
     if (LsSize(this) % SZREALLOC == 0) {                                    \
         (this) = (int *)realloc(&LsSize(this),                              \
                                 sizeof(int)                                 \
@@ -17,6 +22,16 @@ typedef void ** Ls;
                  + 1;                                                       \
     }                                                                       \
     ((Ls )(this))[LsSize(this)++] = (item);                                 \
+}
+
+#define LsFind(this, item, equal, idx) {                    \
+    (idx) = -1;                                             \
+    if (this) for (int _i = 0; _i < LsSize(this); ++_i) {   \
+        if (equal(((Ls )(this))[_i], item)) {               \
+            (idx) = _i;                                     \
+            break;                                          \
+        }                                                   \
+    }                                                       \
 }
 
 #define LsFree(this) free(&LsSize(this))
@@ -35,16 +50,21 @@ typedef char * It;
 
 #define ItFree(this) free(&ItInt2(this))
 
-static inline char *pstrstr_(char **pstr, char *str_)
+#define Apply(func, arr, n) {           \
+    for (int _i = 0; _i < (n); ++_i)    \
+        func((arr)[_i]);                \
+}
+
+static inline char **pstrstr_(char **pstr, char *str_)
 {
     for (; *pstr; ++pstr)
     {
         int len = strlen(*pstr);
-        if (!memcmp(*pstr, str_, len)
+        if (0 == memcmp(*pstr, str_, len)
             && (  str_[len] == '\0'
                || str_[len] == '/')) break;
     }
-    return *pstr;
+    return pstr;
 }
 
 #endif
