@@ -1,6 +1,6 @@
 ## Archiver with LZW compression
 
-Linux only yet...
+Linux only.
 
 Usage:
 
@@ -14,7 +14,7 @@ Usage:
 
 -- extract from archive to dest-path (default: ./) the listed items (default: all)
 
--- specify empty string (`""`) as item to start visual selection
+-- specify empty string `""` as item to start visual selection (VT100 required)
 
 `$ ./lzwarc l <arhive-name>`
 
