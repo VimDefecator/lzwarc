@@ -5,6 +5,7 @@
 #include "bitio.h"
 #include "lzw.h"
 
+#define HTBL_SZ                 33013
 #define HTBL_HASH(key, rng)     (*(uint32_t *)(key) % (rng))
 #define HTBL_EQUAL(key1, key2)  (*(uint32_t *)(key1) == *(uint32_t *)(key2))
 #include "htbl.h"
@@ -13,52 +14,44 @@
 
 enum { Prev, Suff };
 
-typedef struct {
-    int16_t (*ent)[2], nent;
-    htbl_t htbl;
-} dict_t;
+_Thread_local struct {
+    int16_t ent[DICTSIZE][2];
+    int16_t nent;
+} g_dict;
 
-static inline void dict_add(dict_t *this, int prev, int suff)
+static inline void dict_add(int prev, int suff)
 {
-    if (this->nent == DICTSIZE) return;
+    if (g_dict.nent == DICTSIZE) return;
 
-    this->ent[this->nent][Prev] = prev;
-    this->ent[this->nent][Suff] = suff;
-    htbl_add(&this->htbl, this->ent[this->nent]);
+    g_dict.ent[g_dict.nent][Prev] = prev;
+    g_dict.ent[g_dict.nent][Suff] = suff;
+    htbl_add(g_dict.ent[g_dict.nent]);
 
-    ++this->nent;
+    ++g_dict.nent;
 }
 
-static inline int dict_find(dict_t *this, int prev, int suff)
+static inline int dict_find(int prev, int suff)
 {
     int16_t ent[2];
     ent[Prev] = prev;
     ent[Suff] = suff;
 
-    int16_t (*pent)[2] = htbl_find(&this->htbl, ent);
-    return pent ? pent - this->ent : -1;
+    int16_t (*pent)[2] = htbl_find(ent);
+    return pent ? pent - g_dict.ent : -1;
 }
 
-static inline void dict_init(dict_t *this)
+static inline void dict_init()
 {
-    this->ent = calloc(DICTSIZE, 2 * sizeof(int16_t));
-    this->nent = 0;
-    htbl_init(&this->htbl, 33013, NULL, NULL);
+    g_dict.nent = 0;
+    htbl_init();
 
     unsigned char ch = 0;
-    do dict_add(this, -1, ch); while (++ch);
-}
-
-static inline void dict_free(dict_t *this)
-{
-    htbl_free(&this->htbl, NULL);
-    free(this->ent);
+    do dict_add(-1, ch); while (++ch);
 }
 
 void lzw_encode(FILE *fdst, FILE *fsrc)
 {
-    dict_t dict;
-    dict_init(&dict);
+    dict_init();
 
     bitio_t bout = BITIO_INIT;
     bout.file = fdst;
@@ -68,25 +61,20 @@ void lzw_encode(FILE *fdst, FILE *fsrc)
         for(next = -1;
             prev = next,
             EOF != (ch = fgetc(fsrc)) &&
-             -1 != (next = dict_find(&dict, prev, ch)); );
+             -1 != (next = dict_find(prev, ch)); );
         if (prev >= stop) {
             bput(&bout, stop, nbits);
             ++nbits;
             stop <<= 1;
         }
         bput(&bout, prev, nbits);
-        dict_add(&dict, prev, ungetc(ch, fsrc));
+        dict_add(prev, ungetc(ch, fsrc));
     }
     bflush(&bout);
-
-    dict_free(&dict);
 }
 
 void lzw_decode(FILE *fdst, FILE *fsrc)
 {
-    dict_t dict;
-    dict_init(&dict);
-
     bitio_t bin = BITIO_INIT;
     bin.file = fsrc;
 
@@ -101,19 +89,17 @@ void lzw_decode(FILE *fdst, FILE *fsrc)
             continue;
         }
 
-        int add = next == dict.nent;
-        if (add) dict_add(&dict, prev, suff);
+        int add = next == g_dict.nent;
+        if (add) dict_add(prev, suff);
 
         unsigned char buf[DICTSIZE];
         int pos = DICTSIZE, len = 0, curr = next;
-        do buf[--pos] = dict.ent[curr][Suff], ++len;
-            while(-1 != (curr = dict.ent[curr][Prev]));
+        do buf[--pos] = g_dict.ent[curr][Suff], ++len;
+            while(-1 != (curr = g_dict.ent[curr][Prev]));
 
         fwrite(buf+pos, 1, len, fdst);
         suff = buf[pos];
         if (!add && prev != -1)
-            dict_add(&dict, prev, suff);
+            dict_add(prev, suff);
     }
-
-    dict_free(&dict);
 }
