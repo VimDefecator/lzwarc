@@ -75,6 +75,8 @@ void lzw_encode(FILE *fdst, FILE *fsrc)
 
 void lzw_decode(FILE *fdst, FILE *fsrc)
 {
+    dict_init();
+
     bitio_t bin = BITIO_INIT;
     bin.file = fsrc;
 
@@ -103,3 +105,4 @@ void lzw_decode(FILE *fdst, FILE *fsrc)
             dict_add(prev, suff);
     }
 }
+

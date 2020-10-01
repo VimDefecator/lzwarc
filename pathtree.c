@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#define SZREALLOC 0x10
 #include "misc.h"
 #include "pathtree.h"
 
@@ -69,3 +70,4 @@ int pathtree_cmp(pathtree_t **pthis1, pathtree_t **pthis2)
 
     return ret ? ret : strcmp((*pthis1)->name, (*pthis2)->name);
 }
+

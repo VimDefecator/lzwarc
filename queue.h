@@ -7,3 +7,4 @@ void queue_put(void *_this, void *item);
 void *queue_take(void *_this);
 
 #endif
+

@@ -59,3 +59,4 @@ static inline void bflush(bitio_t *this)
 }
 
 #endif
+

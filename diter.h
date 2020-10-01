@@ -7,3 +7,4 @@ void  dclose (void *this);
 int dnext(void *this, char *dest);
 
 #endif
+

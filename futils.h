@@ -12,3 +12,4 @@ void fputs0(char *str, FILE *file);
 void fgets0(char *str, FILE *file);
 
 #endif
+

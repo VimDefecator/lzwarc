@@ -7,3 +7,4 @@ void huffman_encode(FILE *fdst, FILE *fsrc);
 void huffman_decode(FILE *fdst, FILE *fsrc);
 
 #endif
+

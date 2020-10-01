@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef SZREALLOC
 #define SZREALLOC 0x40
+#endif
 
 typedef void ** Ls;
 
@@ -12,16 +14,15 @@ typedef void ** Ls;
 
 #define LsSize(this) (((int *)(this))[-1])
 
-#define LsAdd(this, item) {                                                 \
-    if ((this) == NULL)                                                     \
-        (this) = LsNew;                                                     \
-    if (LsSize(this) % SZREALLOC == 0) {                                    \
-        (this) = (int *)realloc(&LsSize(this),                              \
-                                sizeof(int)                                 \
-                                + (LsSize(this)+SZREALLOC)*sizeof(void *))  \
-                 + 1;                                                       \
-    }                                                                       \
-    ((Ls )(this))[LsSize(this)++] = (item);                                 \
+#define LsAdd(this, item) {                                         \
+    if ((this) == NULL) (this) = LsNew;                             \
+    if (LsSize(this) % SZREALLOC == 0) {                            \
+        (this) = (int *)realloc(                                    \
+            &LsSize(this),                                          \
+            sizeof(int) + (LsSize(this)+SZREALLOC)*sizeof(void *)   \
+        ) + 1;                                                      \
+    }                                                               \
+    ((Ls )(this))[LsSize(this)++] = (item);                         \
 }
 
 #define LsFind(this, item, equal, idx) {                    \
@@ -68,3 +69,4 @@ static inline char **pstrstr_(char **pstr, char *str_)
 }
 
 #endif
+

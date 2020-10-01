@@ -14,3 +14,4 @@ void pathtree_add(pathtree_t *this, char *path);
 void pathtree_sort(pathtree_t *this);
 
 #endif
+

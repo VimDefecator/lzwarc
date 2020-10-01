@@ -50,3 +50,4 @@ void fgets0(char *str, FILE *file)
         *str++ = ch;
     *str = '\0';
 }
+

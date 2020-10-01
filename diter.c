@@ -67,3 +67,4 @@ int dnext(void *_this, char *dest)
     }
     return 1;
 }
+
