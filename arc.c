@@ -253,19 +253,19 @@ void extract(char **ppath, char *key)
         ppath = interact(farc);
 
     FILE *files[2];
-    if (ppath) for (char path[PATH_MAX], **_ppath; fgets0(path, farc), *path; )
+    if (ppath) for (char path[PATH_MAX], *__path; fgets0(path, farc), *path; )
     {
         uint32_t sz, sz_;
         fread(&sz, sizeof(uint32_t), 1, farc);
         fread(&sz_, sizeof(uint32_t), 1, farc);
 
-        if (!*ppath || *(_ppath = pstrstr_(ppath, path)))
+        if (!*ppath || (__path = *pstrstr_(ppath, path)))
         {
             // fopen_mkdir opens new file under specified path,
             // creating all the missing directories along it
 
-            char *sl = strrchr(*_ppath, '/');
-            strcpy(_path, path + (sl ? sl+1 - *_ppath : 0));
+            char *sl = strrchr(__path, '/');
+            strcpy(_path, path + (sl ? sl+1 - __path : 0));
 
             FILE *fdst, *ftmp;
             fdst = fopen_mkdir(dpath, "wb");
