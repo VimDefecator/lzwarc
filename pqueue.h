@@ -21,20 +21,20 @@ typedef void ** PQ;
 
 #define PQnitem(this) (((size_t *)(this))[-1])
 
-#define PQpush(this, item, higher)                          \
-{                                                           \
-    if (++PQnitem(this) == PQsize(this)) {                  \
-        (this) = (size_t *)realloc(                         \
-            &PQsize(this),                                  \
-           sizeof(size_t)*2 + sizeof(void *)*2*PQsize(this) \
-        ) + 2;                                              \
-    }                                                       \
-    (this)[PQnitem(this)] = (item);                         \
-                                                            \
-    for (int _i = PQnitem(this); _i/2 > 0; _i /= 2) {       \
-        if (higher((this)[_i/2], (this)[_i])) break;        \
-        Swap((this)[_i], (this)[_i/2]);                     \
-    }                                                       \
+#define PQpush(this, item, higher)                              \
+{                                                               \
+    if (++PQnitem(this) == PQsize(this)) {                      \
+        (this) = (size_t *)realloc(                             \
+            &PQsize(this),                                      \
+            sizeof(size_t)*2 + sizeof(void *)*2*PQsize(this)    \
+        ) + 2;                                                  \
+    }                                                           \
+    (this)[PQnitem(this)] = (item);                             \
+                                                                \
+    for (int _i = PQnitem(this); _i/2 > 0; _i /= 2) {           \
+        if (higher((this)[_i/2], (this)[_i])) break;            \
+        Swap((this)[_i], (this)[_i/2]);                         \
+    }                                                           \
 }
 
 #define PQpop(this, item, higher) if (PQnitem(this) != 0)       \

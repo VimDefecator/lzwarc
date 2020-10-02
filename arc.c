@@ -103,7 +103,7 @@ void archive(char **ppath, char *key, char algo)
 
     int szarc_, _szarc, nfiles = 0;
 
-    queue = queue_new(100);
+    queue = queue_new(128, sizeof(int) + PATH_MAX);
 
     farc = fopen(*ppath, "rb");
     if (farc) {
@@ -131,8 +131,10 @@ void archive(char **ppath, char *key, char algo)
     for (int i = 0; i < nthr; ++i)
         pthread_create(&thr[i], NULL, parchive, args);
 
-    for (; *ppath; ++ppath)
-    {
+    char ltrimfpath[sizeof(int) + PATH_MAX];
+    int *ltrim = ltrimfpath;
+    char *fpath = ltrim + 1;
+    for (; *ppath; ++ppath) {
         // diter recursively returns paths to all underlying files, if a
         // directory is specified, or a single file - same as given
 
@@ -141,23 +143,22 @@ void archive(char **ppath, char *key, char algo)
         // the resulting archive, so strings with prefix lengths are pushed
 
         char *sl = strrchr(*ppath, '/');
-        sl = sl ? sl+1 : *ppath;
+        *ltrim = sl ? sl + 1 - *ppath : 0;
 
         void *diter = dopen(*ppath);
-        for(char fpath[PATH_MAX];
-            dnext(diter, fpath);
-            ++nfiles)
-        {
-            It item;
-            ItInit(item, fpath, sl-*ppath, 0);
-            queue_put(queue, item);
+        while (
+            dnext(diter, fpath)
+        ) {
+            queue_put(queue, ltrimfpath);
+            ++nfiles;
         }
         dclose(diter);
     }
+    *ltrim = -1;
 
     // tell the threads to terminate by feeding each one with a NULL
     for (int i = 0; i < nthr; ++i)
-        queue_put(queue, NULL);
+        queue_put(queue, ltrimfpath);
 
     for (int i = 0; i < nthr; ++i)
         pthread_join(thr[i], NULL);
@@ -181,12 +182,17 @@ void *parchive(void *args)
     char            *key    = (char            *)((void **)args)[KEY  ];
     pthread_mutex_t *pmutex = (pthread_mutex_t *)((void **)args)[MUTEX];
 
-    for (It item; item = queue_take(queue); ItFree(item))
-    {
+    char ltrimfpath[sizeof(int) + PATH_MAX];
+    int *ltrim = ltrimfpath;
+    char *fpath = ltrim + 1;
+    while (
+        queue_take(queue, ltrimfpath),
+        *ltrim != -1
+    ) {
         FILE *file, *tfile;
         uint32_t sz, sz_;
 
-        file = fopen(item, "rb");
+        file = fopen(fpath, "rb");
         if (!file) continue;
 
         // send encoder output to temporary file and write it to archive only
@@ -207,7 +213,7 @@ void *parchive(void *args)
 
         pthread_mutex_lock(pmutex);
 
-        fputs0(item + ItInt1(item), farc);
+        fputs0(fpath + *ltrim, farc);
         fwrite(&sz, sizeof(uint32_t), 1, farc);
         fwrite(&sz_, sizeof(uint32_t), 1, farc);
         fxor(farc, file, sz_, key);
@@ -219,7 +225,7 @@ void *parchive(void *args)
     }
 }
 
-enum { DFILE, TFILE };
+enum { DST, TMP };
 
 Ls interact(FILE *farc);
 
@@ -231,7 +237,7 @@ void extract(char **ppath, char *key)
     void *queue;
     FILE *farc;
 
-    queue = queue_new(100);
+    queue = queue_new(128, 2 * sizeof(FILE *));
     farc = fopen(*ppath++, "rb");
     decode = decoders[fgetc(farc)];
 
@@ -246,6 +252,7 @@ void extract(char **ppath, char *key)
     if (*ppath && **ppath == '\0')
         ppath = interact(farc);
 
+    FILE *files[2];
     if (ppath) for (char path[PATH_MAX], **_ppath; fgets0(path, farc), *path; )
     {
         uint32_t sz, sz_;
@@ -260,31 +267,33 @@ void extract(char **ppath, char *key)
             char *sl = strrchr(*_ppath, '/');
             strcpy(_path, path + (sl ? sl+1 - *_ppath : 0));
 
-            FILE *dfile, *tfile;
-            dfile = fopen_mkdir(dpath, "wb");
+            FILE *fdst, *ftmp;
+            fdst = fopen_mkdir(dpath, "wb");
             if (sz_ < sz)
             {
-                tfile = tmpfile();
-                fxor(tfile, farc, sz_, key);
-                rewind(tfile);
+                ftmp = tmpfile();
+                fxor(ftmp, farc, sz_, key);
+                rewind(ftmp);
 
                 void **item = malloc(2 * sizeof(void *));
-                item[DFILE] = dfile;
-                item[TFILE] = tfile;
-                queue_put(queue, item);
+                files[DST] = fdst;
+                files[TMP] = ftmp;
+                queue_put(queue, files);
             }
             else
             {
-                fxor(dfile, farc, sz_, key);
-                fclose(dfile);
+                fxor(fdst, farc, sz_, key);
+                fclose(fdst);
             }
             // delegate only decoder-involved extracting to parallel threads
         }
         else fseek(farc, sz_, SEEK_CUR);
     }
+    files[DST] = NULL;
+    files[TMP] = NULL;
 
     for (int i = 0; i < nthr; ++i)
-        queue_put(queue, NULL);
+        queue_put(queue, files);
 
     for (int i = 0; i < nthr; ++i)
         pthread_join(thr[i], NULL);
@@ -295,13 +304,14 @@ void extract(char **ppath, char *key)
 
 void *pextract(void *queue)
 {
-    for (void **item; item = queue_take(queue); )
-    {
-        decode(item[DFILE], item[TFILE]);
-
-        fclose(item[DFILE]);
-        fclose(item[TFILE]);
-        free(item);
+    FILE *files[2];
+    while (
+        queue_take(queue, files),
+        files[DST] && files[TMP]
+    ) {
+        decode(files[DST], files[TMP]);
+        fclose(files[DST]);
+        fclose(files[TMP]);
     }
 }
 

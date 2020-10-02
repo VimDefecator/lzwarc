@@ -1,24 +1,26 @@
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 
 #include "queue.h"
 
 typedef struct
 {
-    void **pitem;
-    int size, head, tail;
+    void *buf;
+    int maxitems, szitem, head, tail;
 
     pthread_mutex_t mutex;
     pthread_cond_t cndput, cndtake;
 }
 queue_t;
 
-void *queue_new(int size)
+void *queue_new(int maxitems, int szitem)
 {
     queue_t *this = malloc(sizeof(queue_t));
 
-    this->pitem = malloc(size * sizeof(void *));
-    this->size = size;
+    this->buf = malloc(maxitems * szitem);
+    this->maxitems = maxitems;
+    this->szitem = szitem;
     this->head = 0;
     this->tail = 0;
 
@@ -37,44 +39,44 @@ void queue_free(void *_this)
     pthread_cond_destroy(&this->cndput);
     pthread_mutex_destroy(&this->mutex);
 
-    free(this->pitem);
+    free(this->buf);
     free(this);
 }
 
 #define QUEUE_EMPTY(this) (this->head == this->tail)
-#define QUEUE_FULL(this) ((this->tail + 1) % this->size == this->head)
+#define QUEUE_FULL(this) ((this->tail + 1) % this->maxitems == this->head)
 
-void queue_put(void *_this, void *item)
+void queue_put(void *_this, void *src)
 {
     queue_t *this = _this;
+    char (*buf)[this->szitem] = this->buf;
 
     pthread_mutex_lock(&this->mutex);
 
     while QUEUE_FULL(this)
         pthread_cond_wait(&this->cndtake, &this->mutex);
 
-    this->pitem[this->tail] = item;
-    this->tail = (this->tail + 1) % this->size;
+    memcpy(buf[this->tail], src, sizeof(*buf));
+    this->tail = (this->tail + 1) % this->maxitems;
 
     pthread_mutex_unlock(&this->mutex);
     pthread_cond_signal(&this->cndput);
 }
 
-void *queue_take(void *_this)
+void queue_take(void *_this, void *dst)
 {
     queue_t *this = _this;
+    char (*buf)[this->szitem] = this->buf;
 
     pthread_mutex_lock(&this->mutex);
 
     while QUEUE_EMPTY(this)
         pthread_cond_wait(&this->cndput, &this->mutex);
 
-    void *ret = this->pitem[this->head];
-    this->head = (this->head + 1) % this->size;
+    memcpy(dst, buf[this->head], sizeof(*buf));
+    this->head = (this->head + 1) % this->maxitems;
 
     pthread_mutex_unlock(&this->mutex);
     pthread_cond_signal(&this->cndtake);
-
-    return ret;
 }
 
