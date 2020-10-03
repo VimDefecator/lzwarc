@@ -319,6 +319,7 @@ void lz8_huffman_encode(FILE *fdst, FILE *fsrc)
 {
     FILE *ftmp = tmpfile();
     lz8_encode(ftmp, fsrc);
+    rewind(ftmp);
     huffman_encode(fdst, ftmp);
     fclose(ftmp);
 }
@@ -327,6 +328,7 @@ void lz8_huffman_decode(FILE *fdst, FILE *fsrc)
 {
     FILE *ftmp = tmpfile();
     huffman_decode(ftmp, fsrc);
+    rewind(ftmp);
     lz8_decode(fdst, ftmp);
     fclose(ftmp);
 }
