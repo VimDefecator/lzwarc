@@ -189,7 +189,7 @@ void *parchive(void *args)
         queue_take(queue, ltrimfpath),
         *ltrim != -1
     ) {
-        FILE *file, *tfile;
+        FILE *file, *ftmp;
         uint32_t sz, sz_;
 
         file = fopen(fpath, "rb");
@@ -198,15 +198,15 @@ void *parchive(void *args)
         // send encoder output to temporary file and write it to archive only
         // if the size was succesfully reduced, otherwise copy the source one
 
-        tfile = tmpfile();
-        encode(tfile, file);
+        ftmp = tmpfile();
+        encode(ftmp, file);
         sz = ftell(file);
-        sz_ = ftell(tfile);
+        sz_ = ftell(ftmp);
         if (sz_ < sz) {
             fclose(file);
-            file = tfile;
+            file = ftmp;
         } else {
-            fclose(tfile);
+            fclose(ftmp);
             sz_ = sz;
         }
         rewind(file);

@@ -101,8 +101,7 @@ void lzw_decode(FILE *fdst, FILE *fsrc)
 
         fwrite(buf+pos, 1, len, fdst);
         suff = buf[pos];
-        if (!add && prev != -1)
-            dict_add(prev, suff);
+        if (!add && prev != -1) dict_add(prev, suff);
     }
 }
 
@@ -110,7 +109,8 @@ void lz8_encode(FILE *fdst, FILE *fsrc)
 {
     dict_init();
 
-    for (uint16_t prev, next, ch = 0; ch != EOF; )
+    uint16_t prev, next;
+    for (int ch = 0; ch != EOF; )
     {
         for(next = -1;
             prev = next,
