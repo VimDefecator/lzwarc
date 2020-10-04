@@ -9,55 +9,45 @@
     (b) = _t;           \
 }
 
-typedef void ** PQ;
+_Thread_local void *g_pqueue[PQUEUE_SZ];
+_Thread_local int g_pqueue_nitem;
 
-#define PQinit(this) {                                                      \
-    (this) = (size_t *)malloc(2*sizeof(size_t) + 0x200*sizeof(void *)) + 2; \
-    PQsize(this) = 0x200;                                                   \
-    PQnitem(this) = 0;                                                      \
+static inline void pqueue_init()
+{
+    g_pqueue_nitem = 0;
 }
 
-#define PQsize(this) (((size_t *)(this))[-2])
+static inline void pqueue_push(void *item)
+{
+    g_pqueue[++g_pqueue_nitem] = item;
 
-#define PQnitem(this) (((size_t *)(this))[-1])
-
-#define PQpush(this, item, higher)                              \
-{                                                               \
-    if (++PQnitem(this) == PQsize(this)) {                      \
-        (this) = (size_t *)realloc(                             \
-            &PQsize(this),                                      \
-            sizeof(size_t)*2 + sizeof(void *)*2*PQsize(this)    \
-        ) + 2;                                                  \
-    }                                                           \
-    (this)[PQnitem(this)] = (item);                             \
-                                                                \
-    for (int _i = PQnitem(this); _i/2 > 0; _i /= 2) {           \
-        if (higher((this)[_i/2], (this)[_i])) break;            \
-        Swap((this)[_i], (this)[_i/2]);                         \
-    }                                                           \
+    for (int i = g_pqueue_nitem; i/2 > 0; i /= 2) {
+        if (PQUEUE_CMP(g_pqueue[i/2], g_pqueue[i])) break;
+        Swap(g_pqueue[i], g_pqueue[i/2]);
+    }
 }
 
-#define PQpop(this, item, higher) if (PQnitem(this) != 0)       \
-{                                                               \
-    (item) = (this)[1];                                         \
-    (this)[1] = (this)[PQnitem(this)];                          \
-                                                                \
-    for (int _i = 1, _j; ; _i = _j)                             \
-    {                                                           \
-        if (_i*2   < PQnitem(this) &&                           \
-            higher((this)[_i*2  ], (this)[_i])) _j = _i*2;      \
-        else                                                    \
-        if (_i*2+1 < PQnitem(this) &&                           \
-            higher((this)[_i*2+1], (this)[_i])) _j = _i*2+1;    \
-        else break;                                             \
-                                                                \
-        Swap((this)[_i], (this)[_j]);                           \
-    }                                                           \
-    --PQnitem(this);                                            \
-}                                                               \
-else (item) = NULL;
+static inline void *pqueue_pop()
+{
+    if (g_pqueue_nitem == 0) return NULL;
 
-#define PQfree(this) (free(&PQsize(this)))
+    void *ret = g_pqueue[1];
+
+    g_pqueue[1] = g_pqueue[g_pqueue_nitem];
+    for (int i = 1, j; ; i = j) {
+        if (i*2   < g_pqueue_nitem &&
+            PQUEUE_CMP(g_pqueue[i*2  ], g_pqueue[i])) j = i*2;
+        else
+        if (i*2+1 < g_pqueue_nitem &&
+            PQUEUE_CMP(g_pqueue[i*2+1], g_pqueue[i])) j = i*2+1;
+        else break;
+
+        Swap(g_pqueue[i], g_pqueue[j]);
+    }
+    --g_pqueue_nitem;
+
+    return ret;
+}
 
 #endif
 

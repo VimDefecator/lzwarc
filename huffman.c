@@ -1,41 +1,54 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "pqueue.h"
-#include "bitio.h"
 #include "huffman.h"
+#include "bitio.h"
+
+#ifdef HUFFCHARSIZE
+#define CHSIZ HUFFCHARSIZE
+#else
+#define CHSIZ 1
+#endif
+
+#define CHWID (CHSIZ * 8)
+#define CHRNG (1 << CHWID)
+#define MAXTS (CHRNG * 2)
 
 #define ROOT 0
-#define LEAF 0x1ff
+#define LEAF (CHRNG - 1)
 
 typedef struct {
-    uint32_t occ;
-    uint8_t  ch;
-    uint8_t  bit;
-    uint16_t par, br0, br1;
+    uint32_t occ, ch, bit,
+             par, br0, br1;
 } node_t;
 
 typedef struct {
-    unsigned ch  :  8;
-    unsigned br0 :  12;
-    unsigned br1 :  12;
+    unsigned ch  :  CHWID;
+    unsigned br0 :  CHWID + 4;
+    unsigned br1 :  CHWID + 4;
 } cnode_t;
 
-#define nodehigher(n1, n2) (((node_t *)(n1))->occ < ((node_t *)(n2))->occ)
+#define PQUEUE_SZ MAXTS
+#define PQUEUE_CMP(a, b) (((node_t *)(a))->occ < ((node_t *)(b))->occ)
 
-void writetree(node_t *tree, uint16_t nnod, FILE *file);
+#include "pqueue.h"
+
+void writetree(node_t *tree, uint32_t nnod, FILE *file);
 
 void huffman_encode(FILE *fdst, FILE *fsrc)
 {
-    node_t tree[0x200] = {};
-    for (int ch; EOF != (ch = fgetc(fsrc)); )
-        ++tree[ch].occ;
+    _Thread_local static node_t tree[MAXTS] = {};
+
+    for(uint32_t ch = 0;
+        fread(&ch, CHSIZ, 1, fsrc);
+        ++tree[ch].occ);
 
     uint32_t szfile = ftell(fsrc);
     rewind(fsrc);
 
-    uint16_t tmap[0x100], nnod = 0;
-    for (int ch = 0; ch < 0x100; ++ch) {
+    _Thread_local static uint32_t tmap[CHRNG];
+    uint32_t nnod = 0;
+    for (uint32_t ch = 0; ch < CHRNG; ++ch) {
         if (tree[ch].occ) {
             tree[nnod].occ = tree[ch].occ;
             tree[nnod].ch = ch;
@@ -45,16 +58,15 @@ void huffman_encode(FILE *fdst, FILE *fsrc)
         }
     }
 
-    PQ pq;
-    PQinit(pq);
+    pqueue_init();
 
-    for (int i = 0; i < nnod; ++i)
-        PQpush(pq, tree+i, nodehigher);
+    for (uint32_t i = 0; i < nnod; ++i)
+        pqueue_push(tree+i);
 
     while (1) {
         node_t *nod0, *nod1;
-        PQpop(pq, nod0, nodehigher);
-        PQpop(pq, nod1, nodehigher);
+        nod0 = pqueue_pop();
+        nod1 = pqueue_pop();
 
         if (nod1 == NULL) {
             nod0->par = ROOT;
@@ -69,11 +81,10 @@ void huffman_encode(FILE *fdst, FILE *fsrc)
         tree[nnod].br1 = nod1 - tree;
         tree[nnod].occ = nod0->occ + nod1->occ;
 
-        PQpush(pq, tree+nnod, nodehigher)
+        pqueue_push(tree+nnod);
 
         ++nnod;
     }
-    PQfree(pq);
 
     fwrite(&szfile, sizeof(uint32_t), 1, fdst);
     writetree(tree, nnod, fdst);
@@ -83,14 +94,14 @@ void huffman_encode(FILE *fdst, FILE *fsrc)
 
     rewind(fsrc);
 
-    for (int ch; EOF != (ch = fgetc(fsrc)); )
+    for (uint32_t ch = 0; fread(&ch, CHSIZ, 1, fsrc); )
     {
-        for (int i = tmap[ch]; tree[i].par != ROOT; )
+        for (uint32_t i = tmap[ch]; tree[i].par != ROOT; )
         {
             uint64_t bits, nbits;
 
             for(bits = 0, nbits = 0;
-                nbits < UINTWID &&
+                nbits < BIOBUFW &&
                 tree[i].par != ROOT;
                 bits = (bits << 1) | tree[i].bit,
                 i = tree[i].par, ++nbits);
@@ -101,13 +112,12 @@ void huffman_encode(FILE *fdst, FILE *fsrc)
     bflush(&bout);
 }
 
-uint16_t readtree(cnode_t *tree, FILE *file);
+uint32_t readtree(cnode_t *tree, FILE *file);
 
 void huffman_decode(FILE *fdst, FILE *fsrc)
 {
-    cnode_t tree[0x200];
-    uint16_t nnod;
-    uint32_t outputlen;
+    cnode_t tree[MAXTS];
+    uint32_t nnod, outputlen;
 
     fread(&outputlen, sizeof(uint32_t), 1, fsrc);
     nnod = readtree(tree, fsrc);
@@ -127,11 +137,11 @@ void huffman_decode(FILE *fdst, FILE *fsrc)
     }
 }
 
-void writetree(node_t *tree, uint16_t nnod, FILE *file)
+void writetree(node_t *tree, uint32_t nnod, FILE *file)
 {
-    fwrite(&nnod, sizeof(uint16_t), 1, file);
+    fwrite(&nnod, sizeof(uint32_t), 1, file);
 
-    for (int i = 0; i < nnod; ++i) {
+    for (uint32_t i = 0; i < nnod; ++i) {
         cnode_t cnode;
         cnode.ch  = tree[i].ch;
         cnode.br0 = tree[i].br0;
@@ -140,11 +150,11 @@ void writetree(node_t *tree, uint16_t nnod, FILE *file)
     }
 }
 
-uint16_t readtree(cnode_t *tree, FILE *file)
+uint32_t readtree(cnode_t *tree, FILE *file)
 {
-    uint16_t nnod;
+    uint32_t nnod;
 
-    fread(&nnod, sizeof(uint16_t), 1, file);
+    fread(&nnod, sizeof(uint32_t), 1, file);
     fread(tree, sizeof(cnode_t), nnod, file);
 
     return nnod;
