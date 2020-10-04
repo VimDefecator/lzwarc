@@ -115,7 +115,7 @@ void lz8_encode(FILE *fdst, FILE *fsrc)
         for(next = -1;
             prev = next,
             EOF != (ch = fgetc(fsrc)) &&
-             -1 != (next = dict_find(prev, ch)); );
+            (uint16_t )-1 != (next = dict_find(prev, ch)); );
         fwrite(&prev, sizeof(prev), 1, fdst);
         dict_add(prev, ungetc(ch, fsrc));
     }
@@ -139,7 +139,7 @@ void lz8_decode(FILE *fdst, FILE *fsrc)
 
         fwrite(buf+pos, 1, len, fdst);
         suff = buf[pos];
-        if (!add && prev != -1) dict_add(prev, suff);
+        if (!add && prev != (uint16_t )-1) dict_add(prev, suff);
     }
 }
 
