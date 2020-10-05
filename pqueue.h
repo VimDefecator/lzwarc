@@ -9,8 +9,8 @@
     (b) = _t;           \
 }
 
-_Thread_local void *g_pqueue[PQUEUE_SZ];
-_Thread_local int g_pqueue_nitem;
+_Thread_local static void *g_pqueue[PQUEUE_SZ];
+_Thread_local static int g_pqueue_nitem;
 
 static inline void pqueue_init()
 {

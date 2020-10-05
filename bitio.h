@@ -7,55 +7,60 @@
 
 #define BIOBUFW 64
 
-typedef struct {
-    FILE *file;
-    uint64_t ibuf, ipos,
-             obuf, opos;
-} bitio_t;
+_Thread_local static FILE *g_bfdst, *g_bfsrc;
+_Thread_local static uint64_t g_bibuf, g_bipos, g_bobuf, g_bopos;
 
-#define BITIO_INIT {NULL, 0, BIOBUFW, 0, 0}
+static inline void binit(FILE *fdst, FILE *fsrc)
+{
+    g_bfdst = fdst;
+    g_bfsrc = fsrc;
+    g_bibuf = 0;
+    g_bipos=  BIOBUFW;
+    g_bobuf = 0;
+    g_bopos = 0;
+}
 
-static inline int bget(bitio_t *this, uint64_t *pbits, int nbits)
+static inline int bget(uint64_t *pbits, int nbits)
 {
     nbits = nbits <= BIOBUFW ? nbits : BIOBUFW;
-    *pbits = (this->ipos < BIOBUFW)
-           ? (this->ibuf >> this->ipos) & ((uint64_t )-1 >> (BIOBUFW - nbits))
+    *pbits = (g_bipos < BIOBUFW)
+           ? (g_bibuf >> g_bipos) & ((uint64_t )-1 >> (BIOBUFW - nbits))
            : 0;
-    this->ipos += nbits;
-    if (this->ipos <= BIOBUFW)
+    g_bipos += nbits;
+    if (g_bipos <= BIOBUFW)
         return 0;
 
-    this->ibuf = 0;
-    this->ipos -= BIOBUFW;
-    int rcnt = 8 * fread(&this->ibuf, 1, sizeof(uint64_t), this->file);
-    if (rcnt < this->ipos)
+    g_bibuf = 0;
+    g_bipos -= BIOBUFW;
+    int rcnt = 8 * fread(&g_bibuf, 1, sizeof(uint64_t), g_bfsrc);
+    if (rcnt < g_bipos)
         return -1;
 
-    *pbits |= (this->ibuf & ((uint64_t )-1 >> (BIOBUFW - this->ipos)))
-              << (nbits - this->ipos);
-    this->ibuf <<= BIOBUFW - rcnt;
-    this->ipos += BIOBUFW - rcnt;
+    *pbits |= (g_bibuf & ((uint64_t )-1 >> (BIOBUFW - g_bipos)))
+              << (nbits - g_bipos);
+    g_bibuf <<= BIOBUFW - rcnt;
+    g_bipos += BIOBUFW - rcnt;
         return 0;
 }
 
-static inline void bput(bitio_t *this, uint64_t bits, int nbits)
+static inline void bput(uint64_t bits, int nbits)
 {
     nbits = nbits <= BIOBUFW ? nbits : BIOBUFW;
     if (nbits != BIOBUFW) bits &= (1 << nbits) - 1;
-    this->obuf |= bits << this->opos;
-    this->opos += nbits;
-    if (this->opos < BIOBUFW)
+    g_bobuf |= bits << g_bopos;
+    g_bopos += nbits;
+    if (g_bopos < BIOBUFW)
         return;
 
-    fwrite(&this->obuf, sizeof(uint64_t), 1, this->file);
-    this->opos -= BIOBUFW;
-    this->obuf = this->opos ? bits >> (nbits - this->opos) : 0;
+    fwrite(&g_bobuf, sizeof(uint64_t), 1, g_bfdst);
+    g_bopos -= BIOBUFW;
+    g_bobuf = g_bopos ? bits >> (nbits - g_bopos) : 0;
 }
 
-static inline void bflush(bitio_t *this)
+static inline void bflush()
 {
-    fwrite(&this->obuf, (this->opos+7)/8, 1, this->file);
-    this->obuf = this->opos = 0;
+    fwrite(&g_bobuf, (g_bopos+7)/8, 1, g_bfdst);
+    g_bobuf = g_bopos = 0;
 }
 
 #endif

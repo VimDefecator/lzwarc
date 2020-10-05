@@ -53,8 +53,7 @@ void lzw_encode(FILE *fdst, FILE *fsrc)
 {
     dict_init();
 
-    bitio_t bout = BITIO_INIT;
-    bout.file = fdst;
+    binit(fdst, NULL);
 
     for (uint64_t prev, next, ch = 0, nbits = 9, stop = 0x100; ch != EOF; )
     {
@@ -63,25 +62,24 @@ void lzw_encode(FILE *fdst, FILE *fsrc)
             EOF != (ch = fgetc(fsrc)) &&
              -1 != (next = dict_find(prev, ch)); );
         if (prev >= stop) {
-            bput(&bout, stop, nbits);
+            bput(stop, nbits);
             ++nbits;
             stop <<= 1;
         }
-        bput(&bout, prev, nbits);
+        bput(prev, nbits);
         dict_add(prev, ungetc(ch, fsrc));
     }
-    bflush(&bout);
+    bflush();
 }
 
 void lzw_decode(FILE *fdst, FILE *fsrc)
 {
     dict_init();
 
-    bitio_t bin = BITIO_INIT;
-    bin.file = fsrc;
+    binit(NULL, fsrc);
 
     for(uint64_t prev = -1, suff, next, nbits = 9, stop = 0x100;
-        -1 != bget(&bin, &next, nbits);
+        -1 != bget(&next, nbits);
         prev = next)
     {
         if (next == stop) {
