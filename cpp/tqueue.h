@@ -4,6 +4,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <cstdio>
 
 template<typename T>
 class tqueue
@@ -15,30 +16,26 @@ public:
         headIdx = tailIdx = 0;
     }
     ~tqueue() {
-        delete buf;
+        delete[] buf;
     }
     void push(T item) {
-        mutex.lock();
-
         std::unique_lock<std::mutex> lock(mutex);
         while (isFull()) condPop.wait(lock);
 
         buf[tailIdx] = item;
         tailIdx = (tailIdx + 1) % bufSize;
 
-        mutex.unlock();
+        lock.unlock();
         condPush.notify_all();
     }
     T pop() {
-        mutex.lock();
-
         std::unique_lock<std::mutex> lock(mutex);
         while (isEmpty()) condPush.wait(lock);
 
         T item = buf[headIdx];
         headIdx = (headIdx + 1) % bufSize;
 
-        mutex.unlock();
+        lock.unlock();
         condPop.notify_all();
 
         return item;
@@ -50,7 +47,7 @@ private:
     std::condition_variable condPush, condPop;
 
     bool isFull() {
-        return (tailIdx + 1) % bufSize == headIdx;
+        return headIdx == (tailIdx + 1) % bufSize;
     }
     bool isEmpty() {
         return headIdx == tailIdx;

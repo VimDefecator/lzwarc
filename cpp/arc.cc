@@ -134,7 +134,6 @@ void archive(char **ppath, char *key, char algo)
     // create multiple threads and feed them with jobs via queue
     for (auto &t : threads) t = thread(parchive, ref(queue), farc, key, ref(theMutex));
 
-    char fpath[PATH_MAX];
     for (; *ppath; ++ppath) {
         // diter recursively returns paths to all underlying files, if a
         // directory is specified, or a single file - same as given
@@ -148,9 +147,7 @@ void archive(char **ppath, char *key, char algo)
 
         for(auto entry : fs::recursive_directory_iterator(*ppath)) {
             if (entry.is_regular_file()) {
-                strcpy(fpath, entry.path().c_str());
-                
-                queue.push({string(fpath), ltrim});
+                queue.push({entry.path(), ltrim});
                 ++nfiles;
             }
         }
@@ -227,11 +224,9 @@ void extract(char **ppath, char *key)
 
     for (auto &t : threads) t = thread(pextract, ref(queue));
 
-    string dirPath(*ppath ? *ppath : "");
-    if (*ppath) ++ppath;
+    string dirPath;
+    if (*ppath) dirPath = *ppath++;
 
-
-    FILE *files[2];
     if (ppath) for (char path[PATH_MAX], **_ppath; fgets0(path, farc), *path; )
     {
         uint32_t sz, sz_;
