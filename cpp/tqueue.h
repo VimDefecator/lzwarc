@@ -4,7 +4,6 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include <cstdio>
 
 template<typename T>
 class tqueue
