@@ -3,8 +3,6 @@
 
 #include <stdio.h>
 
-FILE *fopen_mkdir(const char *path, const char *mode);
-
 void fcopy(FILE *dst, FILE *src, size_t nbytes);
 void fxor (FILE *dst, FILE *src, size_t nbytes, char *key);
 

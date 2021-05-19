@@ -22,6 +22,7 @@ extern "C" {
 }
 
 using namespace std;
+namespace fs = filesystem;
 
 const char *strusage =
     "usage:\n"
@@ -145,7 +146,7 @@ void archive(char **ppath, char *key, char algo)
         char *sl = strrchr(*ppath, '/');
         int ltrim = sl ? sl + 1 - *ppath : 0;
 
-        for(auto entry : filesystem::recursive_directory_iterator(*ppath)) {
+        for(auto entry : fs::recursive_directory_iterator(*ppath)) {
             if (entry.is_regular_file()) {
                 strcpy(fpath, entry.path().c_str());
                 
@@ -226,10 +227,9 @@ void extract(char **ppath, char *key)
 
     for (auto &t : threads) t = thread(pextract, ref(queue));
 
-    char dpath[PATH_MAX], *_path;
-    strcpy(dpath, *ppath ? *ppath : "");
-    _path = dpath + strlen(dpath);
+    string dirPath(*ppath ? *ppath : "");
     if (*ppath) ++ppath;
+
 
     FILE *files[2];
     if (ppath) for (char path[PATH_MAX], **_ppath; fgets0(path, farc), *path; )
@@ -244,10 +244,11 @@ void extract(char **ppath, char *key)
             // creating all the missing directories along it
 
             char *sl = strrchr(*_ppath, '/');
-            strcpy(_path, path + (sl ? sl+1 - *_ppath : 0));
+            string fullPath = dirPath + (path + (sl ? sl+1 - *_ppath : 0));
 
             FILE *fdst, *ftmp;
-            fdst = fopen_mkdir(dpath, "wb");
+            fs::create_directories(fullPath.substr(0, fullPath.rfind('/')));
+            fdst = fopen(fullPath.c_str(), "wb");
             if (sz_ < sz)
             {
                 ftmp = tmpfile();

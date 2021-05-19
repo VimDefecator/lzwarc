@@ -7,16 +7,6 @@
 
 #include "futils.h"
 
-FILE *fopen_mkdir(const char *path, const char *mode)
-{
-    for (char *p = path+1; p = strchr(p, '/'); ++p) {
-        *p = '\0';
-        mkdir(path, 0777);
-        *p = '/';
-    }
-    return fopen(path, mode);
-}
-
 void fcopy(FILE *dst, FILE *src, size_t nbytes)
 {
     char buf[0x4000];

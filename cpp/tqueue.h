@@ -50,10 +50,10 @@ private:
     std::condition_variable condPush, condPop;
 
     bool isFull() {
-        (tailIdx + 1) % bufSize == headIdx;
+        return (tailIdx + 1) % bufSize == headIdx;
     }
     bool isEmpty() {
-        headIdx == tailIdx;
+        return headIdx == tailIdx;
     }
 };
 
