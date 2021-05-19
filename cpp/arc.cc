@@ -18,7 +18,6 @@ extern "C" {
 #include "lzw.h"
 #include "huffman.h"
 #include "futils.h"
-#include "misc.h"
 }
 
 using namespace std;
@@ -224,22 +223,30 @@ void extract(char **ppath, char *key)
 
     for (auto &t : threads) t = thread(pextract, ref(queue));
 
-    string dirPath;
-    if (*ppath) dirPath = *ppath++;
+    string dirPath(*ppath ? *ppath++ : "");
+    char **p2xFirst, **p2xLast;
+    p2xFirst = *ppath ? ppath+1 : ppath;
+    for (p2xLast = p2xFirst; *p2xLast; ++p2xLast);
 
-    if (ppath) for (char path[PATH_MAX], **_ppath; fgets0(path, farc), *path; )
+    for (char path[PATH_MAX]; fgets0(path, farc), *path; )
     {
         uint32_t sz, sz_;
         fread(&sz, sizeof(uint32_t), 1, farc);
         fread(&sz_, sizeof(uint32_t), 1, farc);
 
-        if (!*ppath || *(_ppath = pstrstr_(ppath, path)))
-        {
-            // fopen_mkdir opens new file under specified path,
-            // creating all the missing directories along it
-
-            char *sl = strrchr(*_ppath, '/');
-            string fullPath = dirPath + (path + (sl ? sl+1 - *_ppath : 0));
+        auto **p2xCur = find_if(
+            p2xFirst, p2xLast,
+            [path](auto *p2x){
+                for (int i = 0; p2x[i]; ++i) {
+                    if (p2x[i] != path[i]) return false;
+                }
+                return true;
+            }
+        );
+        if (p2xCur != p2xLast || p2xFirst == p2xLast) {
+            auto p2x = *p2xCur;
+            char *sl = strrchr(p2x, '/');
+            string fullPath = dirPath + (path + (sl ? sl+1 - p2x : 0));
 
             FILE *fdst, *ftmp;
             fs::create_directories(fullPath.substr(0, fullPath.rfind('/')));
