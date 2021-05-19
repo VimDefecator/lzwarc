@@ -1,7 +1,7 @@
-lzwarc: arc.o lzw.o huffman.o futils.o queue.o
-	clang++ -o lzwarc arc.o lzw.o huffman.o futils.o queue.o -lpthread -lstdc++fs
+lzwarc: arc.o lzw.o huffman.o futils.o
+	clang++ -o lzwarc arc.o lzw.o huffman.o futils.o -lpthread -lstdc++fs
 
-arc.o: arc.cc lzw.h huffman.h futils.h queue.h misc.h
+arc.o: arc.cc lzw.h huffman.h futils.h tqueue.h misc.h
 	clang++ -std=c++17 -c arc.cc
 
 lzw.o: lzw.c lzw.h htbl.h bitio.h
@@ -12,7 +12,4 @@ huffman.o: huffman.c huffman.h pqueue.h bitio.h
 
 futils.o: futils.c futils.h
 	clang -c futils.c
-
-queue.o: queue.c queue.h
-	clang -c queue.c
 
