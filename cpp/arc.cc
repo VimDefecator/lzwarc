@@ -12,9 +12,6 @@
 #include "tqueue.h"
 
 extern "C" {
-#include <unistd.h>
-#include <termios.h>
-#include <linux/limits.h>
 #include "lzw.h"
 #include "huffman.h"
 #include "futils.h"
@@ -225,7 +222,7 @@ void extract(char **ppath, char *key)
     p2xFirst = *ppath ? ppath+1 : ppath;
     for (p2xLast = p2xFirst; *p2xLast; ++p2xLast);
 
-    for (char path[PATH_MAX]; fgets0(path, farc), *path; )
+    for (char path[0x1000]; fgets0(path, farc), *path; )
     {
         uint32_t sz, sz_;
         fread(&sz, sizeof(uint32_t), 1, farc);
@@ -324,7 +321,7 @@ void lstcont(char **ppath)
 
     FILE *farc = fopen(*ppath, "rb");
     fgetc(farc);
-    for (char name[PATH_MAX] = ""; fgets0(name, farc), *name; )
+    for (char name[0x1000] = ""; fgets0(name, farc), *name; )
     {
         uint32_t orsz, arsz;
         fread(&orsz, sizeof(uint32_t), 1, farc);
