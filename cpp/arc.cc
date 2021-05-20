@@ -130,13 +130,10 @@ void archive(char **ppath, char *key, char algo)
 
     encode = encoders[algo];
 
-    // create multiple threads and feed them with jobs via queue
+    // create the threads and pass jobs via queue
     for (auto &t : threads) t = thread(parchive, ref(queue), farc, key, ref(theMutex));
 
     for (; *ppath; ++ppath) {
-        // diter recursively returns paths to all underlying files, if a
-        // directory is specified, or a single file - same as given
-
         // full path is needed to open a file, but only subdirectories
         // hierarchy of every separately specified item should be preserved in
         // the resulting archive, so strings with prefix lengths are pushed
@@ -152,7 +149,7 @@ void archive(char **ppath, char *key, char algo)
         }
     }
 
-    // tell the threads to terminate by feeding each one with a NULL
+    // tell the threads to terminate
     for (int i = 0; i < nthr; ++i) queue.push({"", -1});
 
     for (auto &t : threads) t.join();
