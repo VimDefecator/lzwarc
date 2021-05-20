@@ -245,11 +245,12 @@ void extract(char **ppath, char *key)
         );
         if (p2xCur != p2xLast || p2xFirst == p2xLast) {
             auto p2x = *p2xCur;
-            char *sl = strrchr(p2x, '/');
+            char *sl = p2x ? strrchr(p2x, '/') : NULL;
             string fullPath = dirPath + (path + (sl ? sl+1 - p2x : 0));
+            string dirsPath = fullPath.substr(0, fullPath.rfind('/'));
 
             FILE *fdst, *ftmp;
-            fs::create_directories(fullPath.substr(0, fullPath.rfind('/')));
+            fs::create_directories(dirsPath);
             fdst = fopen(fullPath.c_str(), "wb");
             if (sz_ < sz)
             {
