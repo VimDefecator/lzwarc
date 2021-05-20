@@ -26,7 +26,7 @@ const char *strusage =
     "$ ./lzwarc [-p password] x <archive-name> [<dest-path> [<item1> ...]]\n"
     "$ ./lzwarc l <arhive-name>\n";
 
-enum { ALGO_LZW, ALGO_HUFFMAN, ALGO_LZ8HUFFMAN };
+enum { ALGO_LZW, ALGO_HUFFMAN };
 
 int nthr;
 int numcores();
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
             key = *++argv;
             break;
         case 'h':
-            algo = (*argv)[2] ? ALGO_LZ8HUFFMAN : ALGO_HUFFMAN;
+            algo = ALGO_HUFFMAN;
             break;
         }
     }
@@ -86,11 +86,8 @@ int numcores()
     return ncores;
 }
 
-void lz8_huffman_decode(FILE *fdst, FILE *fsrc);
-void lz8_huffman_encode(FILE *fdst, FILE *fsrc);
-
-void (*encoders[])(FILE*,FILE*) = { lzw_encode, huffman_encode, lz8_huffman_encode },
-     (*decoders[])(FILE*,FILE*) = { lzw_decode, huffman_decode, lz8_huffman_decode },
+void (*encoders[])(FILE*,FILE*) = { lzw_encode, huffman_encode },
+     (*decoders[])(FILE*,FILE*) = { lzw_decode, huffman_decode },
      (*encode)(FILE*,FILE*),
      (*decode)(FILE*,FILE*);
 
@@ -279,24 +276,6 @@ void pextract(tqueue<filePair> &queue)
         fclose(fp.dst);
         fclose(fp.src);
     }
-}
-
-void lz8_huffman_encode(FILE *fdst, FILE *fsrc)
-{
-    FILE *ftmp = tmpfile();
-    lz8_encode(ftmp, fsrc);
-    rewind(ftmp);
-    huffman_encode(fdst, ftmp);
-    fclose(ftmp);
-}
-
-void lz8_huffman_decode(FILE *fdst, FILE *fsrc)
-{
-    FILE *ftmp = tmpfile();
-    huffman_decode(ftmp, fsrc);
-    rewind(ftmp);
-    lz8_decode(fdst, ftmp);
-    fclose(ftmp);
 }
 
 // lstcont collects all paths from archive to memory, sorts lexicographically
