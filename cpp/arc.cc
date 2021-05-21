@@ -29,7 +29,6 @@ const char *strusage =
 enum { ALGO_LZW, ALGO_HUFFMAN };
 
 int nthr;
-int numcores();
 
 void archive(char **ppath, char *key, char algo);
 void extract(char **ppath, char *key);
@@ -42,7 +41,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    nthr = numcores();
+    nthr = thread::hardware_concurrency();
 
     char *key = NULL;
     char algo = ALGO_LZW;
@@ -69,21 +68,6 @@ int main(int argc, char **argv)
         lstcont(argv+1);
         break;
     }
-}
-
-int numcores()
-{
-    FILE *fcpuinfo;
-    char line[0x1000];
-    
-    fcpuinfo = fopen("/proc/cpuinfo", "r");
-    do fgets(line, sizeof(line), fcpuinfo);
-        while (!strstr(line, "cpu cores"));
-    fclose(fcpuinfo);
-
-    int ncores;
-    sscanf(strchr(line, ':') + 1, "%d", &ncores);
-    return ncores;
 }
 
 void (*encoders[])(FILE*,FILE*) = { lzw_encode, huffman_encode },
@@ -135,11 +119,16 @@ void archive(char **ppath, char *key, char algo)
         char *sl = strrchr(*ppath, '/');
         int ltrim = sl ? sl + 1 - *ppath : 0;
 
-        for(auto entry : fs::recursive_directory_iterator(*ppath)) {
-            if (entry.is_regular_file()) {
-                queue.push({entry.path(), ltrim});
-                ++nfiles;
+        try {
+            for(auto entry : fs::recursive_directory_iterator(*ppath)) {
+                if (entry.is_regular_file()) {
+                    queue.push({entry.path(), ltrim});
+                    ++nfiles;
+                }
             }
+        } catch (...) {
+            queue.push({string(*ppath), ltrim});
+            ++nfiles;
         }
     }
 
