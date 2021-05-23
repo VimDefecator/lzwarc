@@ -5,8 +5,6 @@
 
 void lzw_encode(FILE *fdst, FILE *fsrc);
 void lzw_decode(FILE *fdst, FILE *fsrc);
-void lz8_encode(FILE *fdst, FILE *fsrc);
-void lz8_decode(FILE *fdst, FILE *fsrc);
 
 #endif
 
