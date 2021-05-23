@@ -91,7 +91,7 @@ void (*encoders[])(FILE*,FILE*) = { lzw_encode, huffman_encode, lz8_huffman_enco
 
 enum { QUEUE, FARC, KEY, MUTEX, NARGS };
 
-void *parchive(void *);
+void *doArchive(void *);
 
 void archive(char **ppath, char *key, char algo)
 {
@@ -129,7 +129,7 @@ void archive(char **ppath, char *key, char algo)
 
     // create multiple threads and feed them with jobs via queue
     for (int i = 0; i < nthr; ++i)
-        pthread_create(&thr[i], NULL, parchive, args);
+        pthread_create(&thr[i], NULL, doArchive, args);
 
     char ltrimfpath[sizeof(int) + PATH_MAX];
     int *ltrim = ltrimfpath;
@@ -175,7 +175,7 @@ void archive(char **ppath, char *key, char algo)
            nfiles, _szarc - szarc_);
 }
 
-void *parchive(void *args)
+void *doArchive(void *args)
 {
     void            *queue  = (void            *)((void **)args)[QUEUE];
     FILE            *farc   = (FILE            *)((void **)args)[FARC ];
@@ -229,7 +229,7 @@ enum { DST, TMP };
 
 Ls interact(FILE *farc);
 
-void *pextract(void *);
+void *doExtract(void *);
 
 void extract(char **ppath, char *key)
 {
@@ -242,7 +242,7 @@ void extract(char **ppath, char *key)
     decode = decoders[fgetc(farc)];
 
     for (int i = 0; i < nthr; ++i)
-        pthread_create(&thr[i], NULL, pextract, queue);
+        pthread_create(&thr[i], NULL, doExtract, queue);
 
     char dpath[PATH_MAX], *_path;
     strcpy(dpath, *ppath ? *ppath : "");
@@ -303,7 +303,7 @@ void extract(char **ppath, char *key)
     fclose(farc);
 }
 
-void *pextract(void *queue)
+void *doExtract(void *queue)
 {
     FILE *files[2];
     while (
