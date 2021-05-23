@@ -80,7 +80,7 @@ struct pathInfo {
     int ltrim;
 };
 
-void parchive(tqueue<pathInfo> &, FILE *, char *, mutex &);
+void doArchive(tqueue<pathInfo> &, FILE *, char *, mutex &);
 
 void archive(char **ppath, char *key, char algo)
 {
@@ -109,7 +109,7 @@ void archive(char **ppath, char *key, char algo)
     encode = encoders[algo];
 
     // create the threads and pass jobs via queue
-    for (auto &t : threads) t = thread(parchive, ref(queue), farc, key, ref(theMutex));
+    for (auto &t : threads) t = thread(doArchive, ref(queue), farc, key, ref(theMutex));
 
     for (; *ppath; ++ppath) {
         // full path is needed to open a file, but only subdirectories
@@ -146,7 +146,7 @@ void archive(char **ppath, char *key, char algo)
            nfiles, _szarc - szarc_);
 }
 
-void parchive(tqueue<pathInfo> &queue, FILE *farc, char *key, mutex &theMutex)
+void doArchive(tqueue<pathInfo> &queue, FILE *farc, char *key, mutex &theMutex)
 {
     for (pathInfo pi; (pi = queue.pop()).ltrim != -1; )
     {
@@ -190,7 +190,7 @@ struct filePair {
     FILE *dst, *src;
 };
 
-void pextract(tqueue<filePair> &);
+void doExtract(tqueue<filePair> &);
 
 void extract(char **ppath, char *key)
 {
@@ -201,7 +201,7 @@ void extract(char **ppath, char *key)
     farc = fopen(*ppath++, "rb");
     decode = decoders[fgetc(farc)];
 
-    for (auto &t : threads) t = thread(pextract, ref(queue));
+    for (auto &t : threads) t = thread(doExtract, ref(queue));
 
     string dirPath(*ppath ? *ppath++ : "");
     char **p2xFirst, **p2xLast;
@@ -257,7 +257,7 @@ void extract(char **ppath, char *key)
     fclose(farc);
 }
 
-void pextract(tqueue<filePair> &queue)
+void doExtract(tqueue<filePair> &queue)
 {
     for (filePair fp; fp = queue.pop(), fp.dst && fp.src; )
     {
