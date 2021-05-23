@@ -14,19 +14,6 @@ static inline void htbl_init() {
     memset(g_htbl.item, 0, sizeof(g_htbl.item));
 }
 
-static inline void htbl_free(
-    void (*item_free)(void *)
-) {
-    if (item_free) {
-        for (int i = 0; i < HTBL_SZ; ++i) {
-            if (g_htbl.item[i] == NULL || g_htbl.item[i] == &g_htbl.deleted)
-                continue;
-            item_free(g_htbl.item[i]);
-        }
-    }
-    free(g_htbl.item);
-}
-
 static inline void **htbl_find_(
     void *item
 ) {
