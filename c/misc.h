@@ -1,8 +1,12 @@
 #ifndef MISC_H
 #define MISC_H
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifndef SZREALLOC
 #define SZREALLOC 0x40
@@ -66,6 +70,16 @@ static inline char **pstrstr_(char **pstr, char *str_)
                || str_[len] == '/')) break;
     }
     return pstr;
+}
+
+static inline FILE *fopen_mkdir(char *path, char *mode)
+{
+    for (char *p = path+1; p = strchr(p, '/'); ++p) {
+        *p = '\0';
+        mkdir(path, 0777);
+        *p = '/';
+    }
+    return fopen(path, mode);
 }
 
 #endif

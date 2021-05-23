@@ -1,24 +1,24 @@
 lzwarc: arc.o lzw.o huffman.o futils.o diter.o queue.o pathtree.o
-	gcc -o lzwarc arc.o lzw.o huffman.o futils.o diter.o queue.o pathtree.o -lpthread
+	clang -o lzwarc arc.o lzw.o huffman.o futils.o diter.o queue.o pathtree.o -lpthread
 
-arc.o: arc.c lzw.h huffman.h futils.h diter.h queue.h pathtree.h misc.h
-	gcc -O3 -c arc.c
+arc.o: arc.c ../common/lzw.h ../common/huffman.h ../common/futils.h diter.h queue.h pathtree.h misc.h
+	clang -O3 -c arc.c
 
-lzw.o: lzw.c lzw.h htbl.h bitio.h
-	gcc -O3 -c lzw.c
+lzw.o: ../common/lzw.c ../common/lzw.h ../common/htbl.h ../common/bitio.h
+	clang -O3 -c ../common/lzw.c
 
-huffman.o: huffman.c huffman.h pqueue.h bitio.h
-	gcc -O3 -c huffman.c
+huffman.o: ../common/huffman.c ../common/huffman.h ../common/pqueue.h ../common/bitio.h
+	clang -O3 -c ../common/huffman.c
 
-futils.o: futils.c futils.h
-	gcc -O3 -c futils.c
+futils.o: ../common/futils.c ../common/futils.h
+	clang -O3 -c ../common/futils.c
 
 diter.o: diter.c diter.h
-	gcc -O3 -c diter.c
+	clang -O3 -c diter.c
 
 queue.o: queue.c queue.h
-	gcc -O3 -c queue.c
+	clang -O3 -c queue.c
 
 pathtree.o: pathtree.c pathtree.h
-	gcc -O3 -c pathtree.c
+	clang -O3 -c pathtree.c
 

@@ -12,9 +12,9 @@
 #include "tqueue.h"
 
 extern "C" {
-#include "lzw.h"
-#include "huffman.h"
-#include "futils.h"
+#include "../common/lzw.h"
+#include "../common/huffman.h"
+#include "../common/futils.h"
 }
 
 using namespace std;

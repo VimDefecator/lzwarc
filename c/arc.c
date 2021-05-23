@@ -7,9 +7,9 @@
 #include <termios.h>
 #include <linux/limits.h>
 
-#include "lzw.h"
-#include "huffman.h"
-#include "futils.h"
+#include "../common/lzw.h"
+#include "../common/huffman.h"
+#include "../common/futils.h"
 #include "diter.h"
 #include "queue.h"
 #include "pathtree.h"
