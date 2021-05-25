@@ -13,16 +13,6 @@ void fcopy(FILE *dst, FILE *src, size_t nbytes)
         nbytes -= fwrite(buf, 1, fread(buf, 1, nbytes, src), dst);
 }
 
-void fxor(FILE *dst, FILE *src, size_t nbytes, char *key)
-{
-    if (key) {
-        size_t klen = strlen(key);
-        while (nbytes--) fputc(fgetc(src)^key[nbytes%klen], dst);
-    } else {
-        fcopy(dst, src, nbytes);
-    }
-}
-
 void fputs0(const char *str, FILE *file)
 {
     fputs(str, file);

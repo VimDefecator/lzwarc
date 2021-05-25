@@ -17,8 +17,8 @@
 
 char *strusage =
     "usage:\n"
-    "$ ./lzwarc [-p password] [-h] a <archive-name> <item1> ...\n"
-    "$ ./lzwarc [-p password] x <archive-name> [<dest-path> [<item1> ...]]\n"
+    "$ ./lzwarc [-h] a <archive-name> <item1> ...\n"
+    "$ ./lzwarc x <archive-name> [<dest-path> [<item1> ...]]\n"
     "$ ./lzwarc l <arhive-name>\n";
 
 enum { ALGO_LZW, ALGO_HUFFMAN };
@@ -26,8 +26,8 @@ enum { ALGO_LZW, ALGO_HUFFMAN };
 int nthr;
 int numcores();
 
-void archive(char **ppath, char *key, char algo);
-void extract(char **ppath, char *key);
+void archive(char **ppath, char algo);
+void extract(char **ppath);
 void lstcont(char **ppath);
 
 int main(int argc, char **argv)
@@ -39,14 +39,10 @@ int main(int argc, char **argv)
 
     nthr = numcores();
 
-    char *key = NULL;
     char algo = ALGO_LZW;
 
     while ((*++argv)[0] == '-') {
         switch ((*argv)[1]) {
-        case 'p':
-            key = *++argv;
-            break;
         case 'h':
             algo = ALGO_HUFFMAN;
             break;
@@ -55,10 +51,10 @@ int main(int argc, char **argv)
 
     switch ((*argv)[0]) {
     case 'a':
-        archive(argv+1, key, algo);
+        archive(argv+1, algo);
         break;
     case 'x':
-        extract(argv+1, key);
+        extract(argv+1);
         break;
     case 'l':
         lstcont(argv+1);
@@ -86,11 +82,11 @@ void (*encoders[])(FILE*,FILE*) = { lzw_encode, huffman_encode },
      (*encode)(FILE*,FILE*),
      (*decode)(FILE*,FILE*);
 
-enum { QUEUE, FARC, KEY, MUTEX, NARGS };
+enum { QUEUE, FARC, MUTEX, NARGS };
 
 void *doArchive(void *);
 
-void archive(char **ppath, char *key, char algo)
+void archive(char **ppath, char algo)
 {
     pthread_t thr[nthr];
     void *args[NARGS];
@@ -119,7 +115,6 @@ void archive(char **ppath, char *key, char algo)
 
     args[QUEUE] = queue;
     args[FARC]  = farc;
-    args[KEY]   = key;
     args[MUTEX] = &mutex;
 
     encode = encoders[algo];
@@ -176,7 +171,6 @@ void *doArchive(void *args)
 {
     void            *queue  = (void            *)((void **)args)[QUEUE];
     FILE            *farc   = (FILE            *)((void **)args)[FARC ];
-    char            *key    = (char            *)((void **)args)[KEY  ];
     pthread_mutex_t *pmutex = (pthread_mutex_t *)((void **)args)[MUTEX];
 
     char ltrimfpath[sizeof(int) + PATH_MAX];
@@ -213,8 +207,7 @@ void *doArchive(void *args)
         fputs0(fpath + *ltrim, farc);
         fwrite(&sz, sizeof(uint32_t), 1, farc);
         fwrite(&sz_, sizeof(uint32_t), 1, farc);
-        fxor(farc, file, sz_, key);
-        // fxor calls fcopy, if key is NULL
+        fcopy(farc, file, sz_);
 
         pthread_mutex_unlock(pmutex);
 
@@ -228,7 +221,7 @@ Ls interact(FILE *farc);
 
 void *doExtract(void *);
 
-void extract(char **ppath, char *key)
+void extract(char **ppath)
 {
     pthread_t thr[nthr];
     void *queue;
@@ -270,7 +263,7 @@ void extract(char **ppath, char *key)
             if (sz_ < sz)
             {
                 ftmp = tmpfile();
-                fxor(ftmp, farc, sz_, key);
+                fcopy(ftmp, farc, sz_);
                 rewind(ftmp);
 
                 void **item = malloc(2 * sizeof(void *));
@@ -280,7 +273,7 @@ void extract(char **ppath, char *key)
             }
             else
             {
-                fxor(fdst, farc, sz_, key);
+                fcopy(fdst, farc, sz_);
                 fclose(fdst);
             }
             // delegate only decoder-involved extracting to parallel threads

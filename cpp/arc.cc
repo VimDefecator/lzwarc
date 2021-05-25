@@ -23,16 +23,16 @@ namespace fs = filesystem;
 
 const char *strusage =
     "usage:\n"
-    "$ ./lzwarc [-p password] [-h] a <archive-name> <item1> ...\n"
-    "$ ./lzwarc [-p password] x <archive-name> [<dest-path> [<item1> ...]]\n"
+    "$ ./lzwarc [-h] a <archive-name> <item1> ...\n"
+    "$ ./lzwarc x <archive-name> [<dest-path> [<item1> ...]]\n"
     "$ ./lzwarc l <arhive-name>\n";
 
 enum { ALGO_LZW, ALGO_HUFFMAN };
 
 int nthr;
 
-void archive(char **ppath, char *key, char algo);
-void extract(char **ppath, char *key);
+void archive(char **ppath, char algo);
+void extract(char **ppath);
 void listContents(char **ppath);
 void explore(char **ppath);
 
@@ -45,14 +45,10 @@ int main(int argc, char **argv)
 
     nthr = thread::hardware_concurrency();
 
-    char *key = NULL;
     char algo = ALGO_LZW;
 
     while ((*++argv)[0] == '-') {
         switch ((*argv)[1]) {
-        case 'p':
-            key = *++argv;
-            break;
         case 'h':
             algo = ALGO_HUFFMAN;
             break;
@@ -61,10 +57,10 @@ int main(int argc, char **argv)
 
     switch ((*argv)[0]) {
     case 'a':
-        archive(argv+1, key, algo);
+        archive(argv+1, algo);
         break;
     case 'x':
-        extract(argv+1, key);
+        extract(argv+1);
         break;
     case 'l':
         listContents(argv+1);
@@ -85,9 +81,9 @@ struct pathInfo {
     int ltrim;
 };
 
-void doArchive(tqueue<pathInfo> &, FILE *, char *, mutex &);
+void doArchive(tqueue<pathInfo> &, FILE *, mutex &);
 
-void archive(char **ppath, char *key, char algo)
+void archive(char **ppath, char algo)
 {
     thread threads[nthr];
     mutex theMutex;
@@ -114,7 +110,7 @@ void archive(char **ppath, char *key, char algo)
     encode = encoders[algo];
 
     // create the threads and pass jobs via queue
-    for (auto &t : threads) t = thread(doArchive, ref(queue), farc, key, ref(theMutex));
+    for (auto &t : threads) t = thread(doArchive, ref(queue), farc, ref(theMutex));
 
     for (; *ppath; ++ppath) {
         // full path is needed to open a file, but only subdirectories
@@ -151,7 +147,7 @@ void archive(char **ppath, char *key, char algo)
            nfiles, _szarc - szarc_);
 }
 
-void doArchive(tqueue<pathInfo> &queue, FILE *farc, char *key, mutex &theMutex)
+void doArchive(tqueue<pathInfo> &queue, FILE *farc, mutex &theMutex)
 {
     for (pathInfo pi; (pi = queue.pop()).ltrim != -1; )
     {
@@ -182,8 +178,7 @@ void doArchive(tqueue<pathInfo> &queue, FILE *farc, char *key, mutex &theMutex)
         fputs0(pi.path.c_str() + pi.ltrim, farc);
         fwrite(&sz, sizeof(uint32_t), 1, farc);
         fwrite(&sz_, sizeof(uint32_t), 1, farc);
-        fxor(farc, file, sz_, key);
-        // fxor calls fcopy, if key is NULL
+        fcopy(farc, file, sz_);
 
         theMutex.unlock();
 
@@ -197,7 +192,7 @@ struct filePair {
 
 void doExtract(tqueue<filePair> &);
 
-void extract(char **ppath, char *key)
+void extract(char **ppath)
 {
     thread threads[nthr];
     tqueue<filePair> queue;
@@ -240,14 +235,14 @@ void extract(char **ppath, char *key)
             if (sz_ < sz)
             {
                 ftmp = tmpfile();
-                fxor(ftmp, farc, sz_, key);
+                fcopy(ftmp, farc, sz_);
                 rewind(ftmp);
 
                 queue.push({fdst, ftmp});
             }
             else
             {
-                fxor(fdst, farc, sz_, key);
+                fcopy(fdst, farc, sz_);
                 fclose(fdst);
             }
             // delegate only decoder-involved extracting to parallel threads
