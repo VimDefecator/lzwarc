@@ -25,6 +25,11 @@ public:
         return children.at(item);
     }
 
+    template<typename FuncT>
+    void iter(FuncT fn) {
+        for (auto pair : children) fn(pair.first);
+    }
+
     void print(
         std::ostream &out,
         bool recursive = true,

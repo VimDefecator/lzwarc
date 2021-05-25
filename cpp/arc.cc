@@ -282,12 +282,22 @@ void listContents(char **ppath)
 
 void explore(pathtree<string, uint32_t> &tree)
 {
+    tree.print(cout, false, "| ");
     for (string item; item != ".."; ) {
-        tree.print(cout, false, "| ");
         cout << "> ";
-        cin >> item;
+        getline(cin, item);
         if (item != "..") {
-            explore(tree.getChild(item));
+            try {
+                explore(tree.getChild(item));
+                tree.print(cout, false, "| ");
+            } catch (...) {
+                cout << "\"" << item << "\" not found. Maybe...\n";
+                tree.iter([item](auto it){
+                    if (it.substr(0, item.length()) == item) {
+                        cout << "| " << it << endl;
+                    }
+                });
+            }
         }
     }
 }
@@ -300,10 +310,7 @@ void explore(char **ppath)
 
 pathtree<string, uint32_t> buildPathTree(FILE *farc)
 {
-    pathtree<string, uint32_t> tree;
-
-    fgetc(farc);
-
+    pathtree<string, uint32_t> tree; fgetc(farc); 
     for (
         char name[0x1000] = "";
         fgets0(name, farc), *name;
