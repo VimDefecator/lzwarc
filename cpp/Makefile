@@ -1,7 +1,7 @@
 lzwarc: arc.o lzw.o huffman.o futils.o
 	clang++ -o lzwarc arc.o lzw.o huffman.o futils.o -lpthread -lstdc++fs
 
-arc.o: arc.cc ../common/lzw.h ../common/huffman.h ../common/futils.h tqueue.h
+arc.o: arc.cc ../common/lzw.h ../common/huffman.h ../common/futils.h tqueue.h pathtree.h
 	clang++ -std=c++17 -O3 -c arc.cc
 
 lzw.o: ../common/lzw.c ../common/lzw.h ../common/htbl.h ../common/bitio.h

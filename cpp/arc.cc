@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstring>
 #include "tqueue.h"
+#include "pathtree.h"
 
 extern "C" {
 #include "../common/lzw.h"
@@ -32,7 +33,8 @@ int nthr;
 
 void archive(char **ppath, char *key, char algo);
 void extract(char **ppath, char *key);
-void lstcont(char **ppath);
+void listContents(char **ppath);
+void explore(char **ppath);
 
 int main(int argc, char **argv)
 {
@@ -65,7 +67,10 @@ int main(int argc, char **argv)
         extract(argv+1, key);
         break;
     case 'l':
-        lstcont(argv+1);
+        listContents(argv+1);
+        break;
+    case 'i':
+        explore(argv+1);
         break;
     }
 }
@@ -267,86 +272,69 @@ void doExtract(tqueue<filePair> &queue)
     }
 }
 
-// lstcont collects all paths from archive to memory, sorts lexicographically
-// and invokes recursive subroutine, which goes through the list via common
-// pointer-to-pointer, twice per segment on each level for directories-first
-// ordering, and does all the indentation
+pathtree<string, uint32_t> buildPathTree(const char *path);
 
-struct fileInfo {
-    string name;
-    uint32_t orsz, arsz;
-};
-
-void rlstcont(
-    vector<fileInfo>::iterator &iter,
-    vector<fileInfo>::iterator iterEnd,
-    int lind, int lpref
-);
-
-void lstcont(char **ppath)
+void listContents(char **ppath)
 {
-    vector<fileInfo> ls;
+    pathtree<string, uint32_t> tree = buildPathTree(*ppath);
+    tree.print(cout);
+}
 
-    FILE *farc = fopen(*ppath, "rb");
+void explore(pathtree<string, uint32_t> &tree)
+{
+    for (string item; item != ".."; ) {
+        tree.print(cout, false, "| ");
+        cout << "> ";
+        cin >> item;
+        if (item != "..") {
+            explore(tree.getChild(item));
+        }
+    }
+}
+
+void explore(char **ppath)
+{
+    pathtree<string, uint32_t> tree = buildPathTree(*ppath);
+    explore(tree);
+}
+
+pathtree<string, uint32_t> buildPathTree(FILE *farc)
+{
+    pathtree<string, uint32_t> tree;
+
     fgetc(farc);
-    for (char name[0x1000] = ""; fgets0(name, farc), *name; )
-    {
+
+    for (
+        char name[0x1000] = "";
+        fgets0(name, farc), *name;
+    ) {
         uint32_t orsz, arsz;
         fread(&orsz, sizeof(uint32_t), 1, farc);
         fread(&arsz, sizeof(uint32_t), 1, farc);
 
-        ls.push_back({name, orsz, arsz});
+        vector<string> path;
+        for (
+            char *tok = strtok(name, "/");
+            tok;
+            tok = strtok(NULL, "/")
+        ) {
+            path.push_back(tok);
+        }
+        tree.addPath(path, orsz);
 
         fseek(farc, arsz, SEEK_CUR);
     }
-    fclose(farc);
 
-    sort(ls.begin(), ls.end(),
-         [](fileInfo fi1, fileInfo fi2){return fi1.name < fi2.name;});
+    rewind(farc);
 
-    auto iter = ls.begin();
-    rlstcont(iter, ls.end(), 0, 0);
+    return tree;
 }
 
-void rlstcont(
-    vector<fileInfo>::iterator &iter,
-    vector<fileInfo>::iterator iterEnd,
-    int lind, int lpref
-) {
-    static const char *ind = "| | | | | | | | | | | | | | | | | | | | | | | "
-                             "| | | | | | | | | | | | | | | | | | | | | | | "
-                             "| | | | | | | | | | | | | | | | | | | | | | | ";
-
-    auto iterBegin = iter;
-    auto nameBegin = iterBegin->name.c_str();
-    for (; iter != iterEnd; ++iter)
-    {
-        const char *name, *sl;
-        name = iter->name.c_str();
-        if (memcmp(name, nameBegin, lpref)) break;
-        sl = strchr(name + lpref, '/');
-        if (!sl++) continue;
-
-        fwrite(ind, 1, lind, stdout);
-        int llpref = sl - (name + lpref);
-        fwrite(name + lpref, 1, llpref, stdout);
-        putchar('\n');
-        rlstcont(iter, iterEnd, lind + 2, lpref + llpref);
-    }
-
-    iter = iterBegin;
-
-    for (; iter != iterEnd; ++iter)
-    {
-        const char *name, *sl;
-        name = iter->name.c_str();
-        if (memcmp(name, nameBegin, lpref)) break;
-        sl = strchr(name + lpref, '/');
-        if (sl) continue; 
-
-        fwrite(ind, 1, lind, stdout);
-        printf("%-*s - %8u > %8u\n",
-               57 - lind, name + lpref, iter->orsz, iter->arsz);
-    }
+pathtree<string, uint32_t> buildPathTree(const char *path)
+{
+    FILE *farc = fopen(path, "rb");
+    pathtree<string, uint32_t> tree = buildPathTree(farc);
+    fclose(farc);
+    return tree;
 }
 
