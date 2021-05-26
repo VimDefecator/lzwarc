@@ -2,32 +2,53 @@
 #include <vector>
 #include <map>
 
-template<typename itemT, typename sizeT>
 class pathtree {
 public:
-    using vecType = std::vector<itemT>;
+    using vecType = std::vector<std::string>;
 
-    void addPath(const vecType &vec, sizeT size) {
-        addPath(vec.cbegin(), vec.cend(), size);
+    void addPath(
+        const vecType &vec,
+        uint32_t fpos,
+        uint32_t orsz,
+        uint32_t arsz
+    ) {
+        addPath(vec.cbegin(), vec.cend(), fpos, orsz, arsz);
     }
+
     void addPath(
         typename vecType::const_iterator first,
         typename vecType::const_iterator last,
-        sizeT size
+        uint32_t fpos,
+        uint32_t orsz,
+        uint32_t arsz
     ) {
         if (first != last) {
-            children[*first++].addPath(first, last, size);
+            children[*first++].addPath(first, last, fpos, orsz, arsz);
+        } else {
+            this->fpos = fpos;
         }
-        this->size += size;
+        this->orsz += orsz;
+        this->arsz += arsz;
     }
 
-    pathtree &getChild(const itemT &item) {
-        return children.at(item);
+    pathtree &getChild(const std::string &key) {
+        return children.at(key);
     }
 
-    template<typename FuncT>
-    void iter(FuncT fn) {
-        for (auto pair : children) fn(pair.first);
+    template<typename Func>
+    void iterKeys(Func fn) const {
+        for (auto &pair : children) fn(pair.first);
+    }
+
+    template<typename Func>
+    void iterFpos(Func fn) const {
+        if (fpos != -1) {
+            fn(fpos);
+        } else {
+            for (auto &pair : children) {
+                pair.second.iterFpos(fn);
+            }
+        }
     }
 
     void print(
@@ -39,7 +60,7 @@ public:
             out << pref
                 << child.first
                 << " : "
-                << child.second.size
+                << child.second.orsz
                 << (recursive || child.second.children.empty() ? "\n" : " /\n");
             if (recursive) {
                 child.second.print(out, true, pref + "| ");
@@ -47,7 +68,7 @@ public:
         }
     }
 private:
-    std::map<itemT, pathtree<itemT, sizeT>> children;
-    sizeT size;
+    std::map<std::string, pathtree> children;
+    uint32_t fpos = -1, orsz, arsz;
 };
 

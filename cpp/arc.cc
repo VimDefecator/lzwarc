@@ -81,7 +81,7 @@ struct pathInfo {
     int ltrim;
 };
 
-void doArchive(tqueue<pathInfo> &, FILE *, mutex &);
+void archiveFiles(FILE *, tqueue<pathInfo> &, mutex &);
 
 void archive(char **ppath, char algo)
 {
@@ -110,7 +110,7 @@ void archive(char **ppath, char algo)
     encode = encoders[algo];
 
     // create the threads and pass jobs via queue
-    for (auto &t : threads) t = thread(doArchive, ref(queue), farc, ref(theMutex));
+    for (auto &t : threads) t = thread(archiveFiles, farc, ref(queue), ref(theMutex));
 
     for (; *ppath; ++ppath) {
         // full path is needed to open a file, but only subdirectories
@@ -133,9 +133,7 @@ void archive(char **ppath, char algo)
         }
     }
 
-    // tell the threads to terminate
-    for (int i = 0; i < nthr; ++i) queue.push({"", -1});
-
+    for (auto &t : threads) queue.push({"", -1});
     for (auto &t : threads) t.join();
 
     _szarc = ftell(farc);
@@ -147,50 +145,70 @@ void archive(char **ppath, char algo)
            nfiles, _szarc - szarc_);
 }
 
-void doArchive(tqueue<pathInfo> &queue, FILE *farc, mutex &theMutex)
+void archiveFile(pathInfo pi, FILE *farc, mutex &theMutex);
+
+void archiveFiles(FILE *farc, tqueue<pathInfo> &queue, mutex &theMutex)
 {
-    for (pathInfo pi; (pi = queue.pop()).ltrim != -1; )
-    {
-        FILE *file, *ftmp;
-        uint32_t sz, sz_;
-
-        file = fopen(pi.path.c_str(), "rb");
-        if (!file) continue;
-
-        // send encoder output to temporary file and write it to archive only
-        // if the size was succesfully reduced, otherwise copy the source one
-
-        ftmp = tmpfile();
-        encode(ftmp, file);
-        sz = ftell(file);
-        sz_ = ftell(ftmp);
-        if (sz_ < sz) {
-            fclose(file);
-            file = ftmp;
-        } else {
-            fclose(ftmp);
-            sz_ = sz;
-        }
-        rewind(file);
-
-        theMutex.lock();
-
-        fputs0(pi.path.c_str() + pi.ltrim, farc);
-        fwrite(&sz, sizeof(uint32_t), 1, farc);
-        fwrite(&sz_, sizeof(uint32_t), 1, farc);
-        fcopy(farc, file, sz_);
-
-        theMutex.unlock();
-
-        fclose(file);
+    for (
+        pathInfo pi;
+        (pi = queue.pop()).ltrim != -1;
+    ) {
+        archiveFile(pi, farc, theMutex);
     }
 }
+
+void archiveFile(pathInfo pi, FILE *farc, mutex &theMutex)
+{
+    FILE *file, *ftmp;
+    uint32_t sz, sz_;
+
+    file = fopen(pi.path.c_str(), "rb");
+    if (!file) return;
+
+    // send encoder output to temporary file and write it to archive only
+    // if the size was succesfully reduced, otherwise copy the source one
+
+    ftmp = tmpfile();
+    encode(ftmp, file);
+    sz = ftell(file);
+    sz_ = ftell(ftmp);
+    if (sz_ < sz) {
+        fclose(file);
+        file = ftmp;
+    } else {
+        fclose(ftmp);
+        sz_ = sz;
+    }
+    rewind(file);
+
+    theMutex.lock();
+
+    fputs0(pi.path.c_str() + pi.ltrim, farc);
+    fwrite(&sz, sizeof(uint32_t), 1, farc);
+    fwrite(&sz_, sizeof(uint32_t), 1, farc);
+    fcopy(farc, file, sz_);
+
+    theMutex.unlock();
+
+    fclose(file);
+}
+
+void createFolders(string filePath);
 
 struct filePair {
     FILE *dst, *src;
 };
 
-void doExtract(tqueue<filePair> &);
+struct fileInfo {
+    string path;
+    uint32_t orsz, arsz;
+};
+
+fileInfo readFileInfo(FILE *farc);
+
+void extract1(FILE *farc, fileInfo finfo, tqueue<filePair> &queue);
+
+void extract2(tqueue<filePair> &queue);
 
 void extract(char **ppath)
 {
@@ -201,94 +219,74 @@ void extract(char **ppath)
     farc = fopen(*ppath++, "rb");
     decode = decoders[fgetc(farc)];
 
-    for (auto &t : threads) t = thread(doExtract, ref(queue));
+    for (auto &t : threads) t = thread(extract2, ref(queue));
 
     string dirPath(*ppath ? *ppath++ : "");
     char **p2xFirst, **p2xLast;
     p2xFirst = *ppath ? ppath+1 : ppath;
     for (p2xLast = p2xFirst; *p2xLast; ++p2xLast);
 
-    for (char path[0x1000]; fgets0(path, farc), *path; )
-    {
-        uint32_t sz, sz_;
-        fread(&sz, sizeof(uint32_t), 1, farc);
-        fread(&sz_, sizeof(uint32_t), 1, farc);
-
+    for (
+        fileInfo finfo;
+        (finfo = readFileInfo(farc)).path != "";
+    ) {
         auto **p2xCur = find_if(
             p2xFirst, p2xLast,
-            [path](auto *p2x){
-                for (int i = 0; p2x[i]; ++i) {
-                    if (p2x[i] != path[i]) return false;
-                }
-                return true;
+            [&finfo](auto *p2x){
+                return !memcmp(finfo.path.c_str(), p2x, strlen(p2x));
             }
         );
         if (p2xCur != p2xLast || p2xFirst == p2xLast) {
-            auto p2x = *p2xCur;
-            char *sl = p2x ? strrchr(p2x, '/') : NULL;
-            string fullPath = dirPath + (path + (sl ? sl+1 - p2x : 0));
-            string dirsPath = fullPath.substr(0, fullPath.rfind('/'));
-
-            FILE *fdst, *ftmp;
-            fs::create_directories(dirsPath);
-            fdst = fopen(fullPath.c_str(), "wb");
-            if (sz_ < sz)
-            {
-                ftmp = tmpfile();
-                fcopy(ftmp, farc, sz_);
-                rewind(ftmp);
-
-                queue.push({fdst, ftmp});
-            }
-            else
-            {
-                fcopy(fdst, farc, sz_);
-                fclose(fdst);
-            }
-            // delegate only decoder-involved extracting to parallel threads
+            finfo.path = dirPath + finfo.path;
+            extract1(farc, finfo, queue);
+        } else {
+            fseek(farc, finfo.arsz, SEEK_CUR);
         }
-        else fseek(farc, sz_, SEEK_CUR);
     }
 
-    for (int i = 0; i < nthr; ++i) queue.push({NULL, NULL});
-
+    for (auto &t : threads) queue.push({NULL, NULL});
     for (auto &t : threads) t.join();
 
     fclose(farc);
 }
 
-void doExtract(tqueue<filePair> &queue)
-{
-    for (filePair fp; fp = queue.pop(), fp.dst && fp.src; )
-    {
-        decode(fp.dst, fp.src);
-        fclose(fp.dst);
-        fclose(fp.src);
-    }
-}
-
-pathtree<string, uint32_t> buildPathTree(const char *path);
+pathtree buildPathTree(FILE *farc);
+pathtree buildPathTree(const char *path);
 
 void listContents(char **ppath)
 {
-    pathtree<string, uint32_t> tree = buildPathTree(*ppath);
+    pathtree tree = buildPathTree(*ppath);
     tree.print(cout);
 }
 
-void explore(pathtree<string, uint32_t> &tree)
+void explore(FILE *farc, pathtree &tree, tqueue<filePair> &queue)
 {
     tree.print(cout, false, "| ");
-    for (string item; item != ".."; ) {
+    for (string command; command != ".."; ) {
         cout << "> ";
-        getline(cin, item);
-        if (item != "..") {
+        getline(cin, command);
+        if (command != "..") {
+            char action = command[0];
+            string path = command.substr(2);
             try {
-                explore(tree.getChild(item));
-                tree.print(cout, false, "| ");
+                auto &child = tree.getChild(path);
+                switch (action) {
+                    case 'l': {
+                        explore(farc, child, queue);
+                        tree.print(cout, false, "| ");
+                        break;
+                    }
+                    case 'x': {
+                        child.iterFpos([=, &queue](auto fpos){
+                            fseek(farc, fpos, SEEK_SET);
+                            extract1(farc, readFileInfo(farc), queue);
+                        });
+                    }
+                }
             } catch (...) {
-                cout << "\"" << item << "\" not found. Maybe...\n";
-                tree.iter([item](auto it){
-                    if (it.substr(0, item.length()) == item) {
+                cout << "\"" << path << "\" not found. Maybe...\n";
+                tree.iterKeys([&](auto it){
+                    if (it.substr(0, path.length()) == path) {
                         cout << "| " << it << endl;
                     }
                 });
@@ -299,18 +297,65 @@ void explore(pathtree<string, uint32_t> &tree)
 
 void explore(char **ppath)
 {
-    pathtree<string, uint32_t> tree = buildPathTree(*ppath);
-    explore(tree);
+    FILE *farc = fopen(*ppath, "rb");
+    decode = decoders[fgetc(farc)];
+
+    thread threads[nthr];
+    tqueue<filePair> queue;
+
+    for (auto &t : threads) t = thread(extract2, ref(queue));
+
+    auto tree = buildPathTree(farc);
+    explore(farc, tree, queue);
+
+    for (auto &t : threads) queue.push({NULL, NULL});
+    for (auto &t : threads) t.join();
+
+    fclose(farc);
 }
 
-pathtree<string, uint32_t> buildPathTree(FILE *farc)
+void extract1(FILE *farc, fileInfo finfo, tqueue<filePair> &queue)
 {
-    pathtree<string, uint32_t> tree; fgetc(farc); 
-    for (
-        char name[0x1000] = "";
-        fgets0(name, farc), *name;
-    ) {
-        uint32_t orsz, arsz;
+    FILE *fdst, *ftmp;
+
+    createFolders(finfo.path);
+    fdst = fopen(finfo.path.c_str(), "wb");
+
+    if (finfo.orsz != finfo.arsz) {
+        ftmp = tmpfile();
+        fcopy(ftmp, farc, finfo.arsz);
+        rewind(ftmp);
+        queue.push({fdst, ftmp});
+    } else {
+        fcopy(fdst, farc, finfo.arsz);
+        fclose(fdst);
+    }
+}
+
+void extract2(tqueue<filePair> &queue)
+{
+    for (filePair fp; fp = queue.pop(), fp.dst && fp.src; )
+    {
+        decode(fp.dst, fp.src);
+        fclose(fp.dst);
+        fclose(fp.src);
+    }
+}
+
+pathtree buildPathTree(FILE *farc)
+{
+    pathtree tree;
+
+    auto initfpos = ftell(farc);
+    fseek(farc, 1, SEEK_SET);
+    for (char name[0x1000]; ; )
+    {
+        uint32_t fpos, orsz, arsz;
+
+        fpos = ftell(farc);
+        fgets0(name, farc);
+        if (name[0] == '\0') break;
+
         fread(&orsz, sizeof(uint32_t), 1, farc);
         fread(&arsz, sizeof(uint32_t), 1, farc);
 
@@ -322,21 +367,40 @@ pathtree<string, uint32_t> buildPathTree(FILE *farc)
         ) {
             path.push_back(tok);
         }
-        tree.addPath(path, orsz);
+        tree.addPath(path, fpos, orsz, arsz);
 
         fseek(farc, arsz, SEEK_CUR);
     }
-
-    rewind(farc);
+    fseek(farc, initfpos, SEEK_SET);
 
     return tree;
 }
 
-pathtree<string, uint32_t> buildPathTree(const char *path)
+pathtree buildPathTree(const char *path)
 {
     FILE *farc = fopen(path, "rb");
-    pathtree<string, uint32_t> tree = buildPathTree(farc);
+    pathtree tree = buildPathTree(farc);
     fclose(farc);
     return tree;
+}
+
+void createFolders(string filePath)
+{
+    auto sl = filePath.rfind('/');
+    if (sl != string::npos) {
+        fs::create_directories(filePath.substr(0, sl));
+    }
+}
+
+fileInfo readFileInfo(FILE *farc)
+{
+    char path[0x1000];
+    uint32_t orsz, arsz;
+
+    fgets0(path, farc);
+    fread(&orsz, sizeof(uint32_t), 1, farc);
+    fread(&arsz, sizeof(uint32_t), 1, farc);
+
+    return {path, orsz, arsz};
 }
 
