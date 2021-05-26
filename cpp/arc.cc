@@ -31,10 +31,10 @@ enum { ALGO_LZW, ALGO_HUFFMAN };
 
 int nthr;
 
-void archive(char **ppath, char algo);
-void extract(char **ppath);
-void listContents(char **ppath);
-void explore(char **ppath);
+void archive(char **, char);
+void extract(char **);
+void listContents(char **);
+void explore(char **);
 
 int main(int argc, char **argv)
 {
@@ -81,7 +81,7 @@ struct pathInfo {
     int ltrim;
 };
 
-void archiveFiles(FILE *, tqueue<pathInfo> &, mutex &);
+void doArchive(FILE *, mutex &, tqueue<pathInfo> &);
 
 void archive(char **ppath, char algo)
 {
@@ -110,7 +110,9 @@ void archive(char **ppath, char algo)
     encode = encoders[algo];
 
     // create the threads and pass jobs via queue
-    for (auto &t : threads) t = thread(archiveFiles, farc, ref(queue), ref(theMutex));
+    for (auto &t : threads) {
+        t = thread(doArchive, farc, ref(theMutex), ref(queue));
+    }
 
     for (; *ppath; ++ppath) {
         // full path is needed to open a file, but only subdirectories
@@ -145,55 +147,48 @@ void archive(char **ppath, char algo)
            nfiles, _szarc - szarc_);
 }
 
-void archiveFile(pathInfo pi, FILE *farc, mutex &theMutex);
-
-void archiveFiles(FILE *farc, tqueue<pathInfo> &queue, mutex &theMutex)
+void doArchive(FILE *farc, mutex &theMutex, tqueue<pathInfo> &queue)
 {
     for (
         pathInfo pi;
         (pi = queue.pop()).ltrim != -1;
     ) {
-        archiveFile(pi, farc, theMutex);
-    }
-}
+        FILE *file, *ftmp;
+        uint32_t orsz, arsz;
 
-void archiveFile(pathInfo pi, FILE *farc, mutex &theMutex)
-{
-    FILE *file, *ftmp;
-    uint32_t sz, sz_;
+        file = fopen(pi.path.c_str(), "rb");
+        if (!file) return;
 
-    file = fopen(pi.path.c_str(), "rb");
-    if (!file) return;
+        // send encoder output to temporary file and write it to archive only
+        // if the size was succesfully reduced, otherwise copy the source one
 
-    // send encoder output to temporary file and write it to archive only
-    // if the size was succesfully reduced, otherwise copy the source one
+        ftmp = tmpfile();
+        encode(ftmp, file);
+        orsz = ftell(file);
+        arsz = ftell(ftmp);
+        if (arsz < orsz) {
+            fclose(file);
+            file = ftmp;
+        } else {
+            fclose(ftmp);
+            arsz = orsz;
+        }
+        rewind(file);
 
-    ftmp = tmpfile();
-    encode(ftmp, file);
-    sz = ftell(file);
-    sz_ = ftell(ftmp);
-    if (sz_ < sz) {
+        theMutex.lock();
+
+        fputs0(pi.path.c_str() + pi.ltrim, farc);
+        fwrite(&orsz, sizeof(uint32_t), 1, farc);
+        fwrite(&arsz, sizeof(uint32_t), 1, farc);
+        fcopy(farc, file, arsz);
+
+        theMutex.unlock();
+
         fclose(file);
-        file = ftmp;
-    } else {
-        fclose(ftmp);
-        sz_ = sz;
     }
-    rewind(file);
-
-    theMutex.lock();
-
-    fputs0(pi.path.c_str() + pi.ltrim, farc);
-    fwrite(&sz, sizeof(uint32_t), 1, farc);
-    fwrite(&sz_, sizeof(uint32_t), 1, farc);
-    fcopy(farc, file, sz_);
-
-    theMutex.unlock();
-
-    fclose(file);
 }
 
-void createFolders(string filePath);
+void createFolders(string);
 
 struct filePair {
     FILE *dst, *src;
@@ -204,11 +199,11 @@ struct fileInfo {
     uint32_t orsz, arsz;
 };
 
-fileInfo readFileInfo(FILE *farc);
+fileInfo readFileInfo(FILE *);
 
-void extract1(FILE *farc, fileInfo finfo, tqueue<filePair> &queue);
+void extract1(FILE *, fileInfo, tqueue<filePair> &);
 
-void extract2(tqueue<filePair> &queue);
+void extract2(tqueue<filePair> &);
 
 void extract(char **ppath)
 {
@@ -232,7 +227,7 @@ void extract(char **ppath)
     ) {
         auto **p2xCur = find_if(
             p2xFirst, p2xLast,
-            [&finfo](auto *p2x){
+            [&](auto *p2x){
                 return !memcmp(finfo.path.c_str(), p2x, strlen(p2x));
             }
         );
@@ -250,8 +245,8 @@ void extract(char **ppath)
     fclose(farc);
 }
 
-pathtree buildPathTree(FILE *farc);
-pathtree buildPathTree(const char *path);
+pathtree buildPathTree(FILE *);
+pathtree buildPathTree(const char *);
 
 void listContents(char **ppath)
 {
