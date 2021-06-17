@@ -37,7 +37,7 @@ public:
 
     template<typename Func>
     void iterKeys(Func fn) const {
-        for (auto &pair : children) fn(pair.first);
+        for (auto &[name, _] : children) fn(name);
     }
 
     template<typename Func>
@@ -45,8 +45,8 @@ public:
         if (fpos != -1) {
             fn(fpos);
         } else {
-            for (auto &pair : children) {
-                pair.second.iterFpos(fn);
+            for (auto &[_, subtree] : children) {
+                subtree.iterFpos(fn);
             }
         }
     }
@@ -56,14 +56,14 @@ public:
         bool recursive = true,
         std::string pref = ""
     ) const {
-        for (auto child : children) {
+        for (auto &[name, subtree] : children) {
             out << pref
-                << child.first
+                << name
                 << " : "
-                << child.second.orsz
-                << (recursive || child.second.children.empty() ? "\n" : " /\n");
+                << subtree.orsz
+                << (recursive || subtree.children.empty() ? "\n" : " /\n");
             if (recursive) {
-                child.second.print(out, true, pref + "| ");
+                subtree.print(out, true, pref + "| ");
             }
         }
     }
